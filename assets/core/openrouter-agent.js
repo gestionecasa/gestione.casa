@@ -1,42 +1,38 @@
-// core/openrouter-agent.js — LLM reale via OpenRouter
+// core/openrouter-agent.js — LLM reale via OpenRouter + MCP tool loop
 
 const OpenRouterAgent = (() => {
 
-  let MODEL = null; // resolved dynamically from OpenRouter models API
+  let MODEL = null;
 
-  async function resolveModel() {
-    if (MODEL) return MODEL;
-    try {
-      const res = await fetch('https://openrouter.ai/api/v1/models', {
-        headers: { Authorization: `Bearer ${OpenRouterAuth.getToken()}` },
-      });
-      const { data } = await res.json();
-      const free = (data || [])
-        .filter(m => m.id.endsWith(':free'))
-        .sort((a, b) => (b.context_length ?? 0) - (a.context_length ?? 0));
-      if (free.length) {
-        MODEL = free[0].id;
-        console.log('[OpenRouter] modello selezionato:', MODEL);
-      } else {
-        MODEL = 'openai/gpt-4o-mini'; // fallback a pagamento se non ci sono free
-      }
-    } catch {
-      MODEL = 'openai/gpt-4o-mini';
-    }
-    return MODEL;
-  }
+  const SYSTEM = `Sei Casa, un assistente domotico intelligente e conversazionale.
+Gestisci la casa: luci, dispositivi smart, spese, bollette, scadenze, promemoria, bonus edilizi.
+Hai accesso ai dispositivi reali tramite tool — usali sempre per leggere stati reali, non inventare.
+Per azioni irreversibili (serrature) chiedi sempre conferma esplicita.
+Rispondi in italiano. Sii conciso e diretto. Usa markdown quando utile.`;
 
-  const SYSTEM = `Sei Casa, un assistente domestico intelligente e conversazionale.
-Aiuti l'utente a gestire la casa: luci e dispositivi smart, spese e bollette, scadenze e contratti, promemoria, bonus edilizi.
-Rispondi sempre in italiano. Sii conciso e diretto. Usa markdown (grassetto, elenchi) per strutturare le risposte quando utile.
-Se non sai qualcosa o non hai accesso ai dati reali della casa, dillo chiaramente e suggerisci come ottenerli.`;
-
-  // Storico messaggi in memoria (max ultimi 20 scambi)
   const history = [];
   const MAX_PAIRS = 20;
 
   function trimHistory() {
     while (history.length > MAX_PAIRS * 2) history.splice(0, 2);
+  }
+
+  async function resolveModel(token) {
+    if (MODEL) return MODEL;
+    try {
+      const res  = await fetch('https://openrouter.ai/api/v1/models', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const { data } = await res.json();
+      const free = (data || [])
+        .filter(m => m.id.endsWith(':free'))
+        .sort((a, b) => (b.context_length ?? 0) - (a.context_length ?? 0));
+      MODEL = free[0]?.id ?? 'openai/gpt-4o-mini';
+    } catch {
+      MODEL = 'openai/gpt-4o-mini';
+    }
+    console.log('[OpenRouter] modello selezionato:', MODEL);
+    return MODEL;
   }
 
   async function process(rawMsg) {
@@ -46,46 +42,43 @@ Se non sai qualcosa o non hai accesso ai dati reali della casa, dillo chiarament
     history.push({ role: 'user', content: rawMsg });
     trimHistory();
 
-    const model = await resolveModel();
+    const model = await resolveModel(token);
 
-    let res, data;
+    // Costruisci messages con system prompt
+    const messages = [
+      { role: 'system', content: SYSTEM },
+      ...history,
+    ];
+
+    let content;
     try {
-      res  = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type':  'application/json',
-          'HTTP-Referer':  window.location.origin,
-          'X-Title':       'Hey Casa',
-        },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: 'system', content: SYSTEM }, ...history],
-        }),
-      });
-      data = await res.json();
+      content = await McpLayer.runAgentLoop(messages, model, token);
     } catch (err) {
       history.pop();
-      return { message: `Errore di rete: ${err.message}` };
-    }
-
-    if (!res.ok) {
-      history.pop();
-      console.error('[OpenRouter] error body:', JSON.stringify(data));
-      const msg = data?.error?.message || `Errore ${res.status}`;
-      if (res.status === 429 || res.status === 404) {
-        MODEL = null; // forza selezione nuovo modello al prossimo invio
-        return { message: `Modello \`${model}\` non disponibile (${res.status}). Riprova — verrà selezionato un modello alternativo.` };
+      console.error('[OpenRouter] error:', err);
+      if (err.status === 429) {
+        MODEL = null;
+        return { message: `Modello sovraccarico (429). Riprova — verrà selezionato un modello alternativo.\n\nModello usato: \`${model}\`` };
       }
-      return { message: `Errore OpenRouter (${res.status}): ${msg}` };
+      if (err.status === 404) {
+        MODEL = null;
+        return { message: `Modello \`${model}\` non disponibile. Riprova tra un momento.` };
+      }
+      return { message: `Errore: ${err.message}` };
     }
 
-    const content = data.choices?.[0]?.message?.content ?? '(nessuna risposta)';
-    history.push({ role: 'assistant', content });
+    // Rimuovi i tool messages intermedi dallo history (teniamo solo user+assistant)
+    // messages ora include system + history + eventuali tool rounds
+    // Sincronizza history con le ultime aggiunte (solo i turni user/assistant)
+    const lastAssistant = messages.filter(m => m.role === 'assistant').at(-1);
+    if (lastAssistant && !history.includes(lastAssistant)) {
+      history.push({ role: 'assistant', content });
+    }
+
     return { message: content };
   }
 
   function clearHistory() { history.length = 0; }
 
-  return { process, clearHistory, MODEL };
+  return { process, clearHistory };
 })();
