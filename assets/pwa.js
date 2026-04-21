@@ -1,10 +1,10 @@
 // assets/pwa.js — PWA install banner + service worker registration
 
 (() => {
-  const DISMISS_KEY = 'pwa-banner-dismissed-at';
   const MOBILE_QUERY = '(max-width: 768px)';
 
   let deferredPrompt = null;
+  let dismissedThisSession = false;
 
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
@@ -15,27 +15,6 @@
 
   function isMobile() {
     return window.matchMedia(MOBILE_QUERY).matches;
-  }
-
-  function recentlyDismissed() {
-    try {
-      const dismissedAt = localStorage.getItem(DISMISS_KEY);
-      return dismissedAt && Date.now() - Number(dismissedAt) < 24 * 60 * 60 * 1000;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  function setDismissed() {
-    try {
-      localStorage.setItem(DISMISS_KEY, String(Date.now()));
-    } catch (_) {}
-  }
-
-  function clearDismissed() {
-    try {
-      localStorage.removeItem(DISMISS_KEY);
-    } catch (_) {}
   }
 
   function elements() {
@@ -54,9 +33,7 @@
 
   function showBanner() {
     const { banner } = elements();
-    if (!banner || isStandalone() || !isMobile()) return;
-    document.documentElement.classList.add('pwa-banner-mobile');
-    document.documentElement.classList.remove('pwa-banner-suppressed');
+    if (!banner || dismissedThisSession || isStandalone() || !isMobile()) return;
     banner.classList.remove('hidden');
   }
 
@@ -72,7 +49,7 @@
   }
 
   async function installFromCommand() {
-    clearDismissed();
+    dismissedThisSession = false;
 
     if (isStandalone()) {
       hideBanner();
@@ -134,7 +111,7 @@
   }
 
   async function uninstallFromCommand() {
-    clearDismissed();
+    dismissedThisSession = false;
 
     const message = isIOS
       ? 'iOS non permette a una pagina web di rimuovere una PWA. Tieni premuta l’icona di Hey Casa nella schermata Home e scegli "Rimuovi app".'
@@ -167,14 +144,7 @@
   window.addEventListener('beforeinstallprompt', e => {
     e.preventDefault();
     deferredPrompt = e;
-    if (!recentlyDismissed()) showBanner();
   });
-
-  if (isStandalone() || !isMobile() || recentlyDismissed()) {
-    hideBanner();
-  } else {
-    showBanner();
-  }
 
   const { installBtn, dismissBtn, bannerSub } = elements();
 
@@ -188,7 +158,7 @@
   });
 
   dismissBtn?.addEventListener('click', () => {
-    setDismissed();
+    dismissedThisSession = true;
     hideBanner();
   });
 

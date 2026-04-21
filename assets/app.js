@@ -419,6 +419,9 @@ const App = (() => {
       const expMatch = prompt.match(/di (luce|gas|acqua)/i);
       if (expMatch) sidebarRevealed.add(`exp-${expMatch[1].toLowerCase()}`);
 
+      sidebar.classList.remove('open');
+      overlay.classList.remove('active');
+
       // Send as chat message
       input.value = prompt;
       sendBtn.disabled = false;
