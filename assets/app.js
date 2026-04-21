@@ -28,6 +28,7 @@ const App = (() => {
 
   // ── INIT ───────────────────────────────────
   function init() {
+    McpLayer.loadFromCache();
     renderWelcome();
     renderSuggestions(INIT_SUGGESTIONS);
     renderSidebar();
@@ -125,6 +126,11 @@ const App = (() => {
         textEl.textContent = `Connesso a ${broker.name} (${broker.ip})`;
         actionsEl.innerHTML = '';
         agentTagline.textContent = `Connesso — ${broker.name}`;
+        // Inizializza MCP layer col broker trovato
+        const haToken = broker.haToken || null;
+        McpLayer.initFromBroker(broker.url, haToken, broker.id)
+          .then(() => appendLog(`[MCP] ${McpLayer.getTools().length} tool disponibili`))
+          .catch(e => appendLog(`[MCP] init error: ${e.message}`));
         setTimeout(hideBar, 2500);
       }, { once: true });
     });
@@ -606,6 +612,7 @@ const App = (() => {
       $('sidebarLogoutBtn').addEventListener('click', () => {
         OpenRouterAuth.logout();
         OpenRouterAgent.clearHistory();
+        McpLayer.clearCache();
         renderAuthWidget();
         agentTagline.textContent = 'Pronto — cosa vuoi fare?';
       }, { once: true });
