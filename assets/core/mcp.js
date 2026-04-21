@@ -13,6 +13,18 @@ const McpLayer = (() => {
     {
       type: 'function',
       function: {
+        name: 'describe_tools',
+        description: `Restituisce la lista completa di tutti i tool disponibili in questo momento,
+sia statici (sempre presenti) sia dinamici (generati dalla discovery del broker LAN).
+Per ogni tool mostra nome, descrizione e parametri richiesti.
+Chiamare quando l'utente chiede "cosa puoi fare?", "quali comandi hai?",
+"che strumenti hai?", "cosa sai fare?", "quali tool hai?".`,
+        parameters: { type: 'object', properties: {}, required: [] }
+      }
+    },
+    {
+      type: 'function',
+      function: {
         name: 'get_broker_status',
         description: `Verifica se il broker domotico è raggiungibile e operativo.
 Chiamare sempre come primo tool se l'utente segnala problemi di connessione
@@ -282,6 +294,34 @@ IMPORTANTE: prima di sbloccare chiedere sempre conferma esplicita all'utente.`,
       case 'control_lock': {
         const svc = input.action === 'lock' ? 'lock/lock' : 'lock/unlock';
         return ha(`services/${svc}`, 'POST', { entity_id: input.entity_id });
+      }
+
+      case 'describe_tools': {
+        const all = getTools();
+        const staticNames  = STATIC_TOOLS.map(t => t.function.name);
+        const dynamicNames = registry.dynamic.map(t => t.function.name);
+
+        return {
+          total: all.length,
+          broker_connected: !!registry.brokerUrl,
+          broker_type: registry.brokerType ?? 'nessuno',
+          static_tools: STATIC_TOOLS.map(t => ({
+            name:        t.function.name,
+            description: t.function.description.split('\n')[0].trim(),
+            params:      Object.keys(t.function.parameters.properties ?? {})
+          })),
+          dynamic_tools: registry.dynamic.length > 0
+            ? registry.dynamic.map(t => ({
+                name:        t.function.name,
+                description: t.function.description.split('\n')[0].trim(),
+                params:      Object.keys(t.function.parameters.properties ?? {}),
+                entities:    t.function.parameters.properties?.entity_id?.enum?.length ?? 0
+              }))
+            : [],
+          note: registry.dynamic.length === 0
+            ? 'Nessun tool dinamico attivo — collega un broker dalla barra di ricerca per abilitarli.'
+            : `${dynamicNames.length} tool dinamici attivi dal broker ${registry.brokerType} su ${registry.brokerUrl}`
+        };
       }
 
       default:
