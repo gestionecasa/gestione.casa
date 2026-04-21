@@ -622,6 +622,11 @@ body {
   align-items: flex-start;
 }
 
+.input-bar.multiline .mic-btn,
+.input-bar.multiline .send-btn {
+  align-self: flex-end;
+}
+
 .input-bar:focus-within {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-dim);
