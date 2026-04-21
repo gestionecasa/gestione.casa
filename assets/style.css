@@ -896,7 +896,7 @@ body {
   display: none;
   align-items: center;
   gap: 12px;
-  margin-bottom: 10px;
+  margin-top: 10px;
   padding: 10px 12px;
   background: #ffffff;
   border: 1px solid var(--border);
@@ -904,7 +904,8 @@ body {
   box-shadow: var(--shadow-sm);
 }
 
-.pwa-banner.hidden {
+.pwa-banner.hidden,
+.pwa-banner-dismissed .pwa-banner {
   display: none;
 }
 

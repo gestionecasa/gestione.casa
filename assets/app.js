@@ -257,7 +257,7 @@ const App = (() => {
     const commandResult = await handleLocalCommand(text);
     if (commandResult) {
       addAgentMessage(commandResult);
-      renderSuggestions(['/install', '/uninstall', 'Stato casa', 'Scadenze imminenti']);
+      renderSuggestions(['/install', '/uninstall', '/cache clean', 'Stato casa']);
 
       agentTagline.textContent = 'Pronto — cosa vuoi fare?';
       $('agentAvatar').classList.remove('thinking');
@@ -314,7 +314,7 @@ const App = (() => {
 
   async function handleLocalCommand(text) {
     const command = text.trim().toLowerCase();
-    if (command !== '/install' && command !== '/uninstall') return null;
+    if (!['/install', '/uninstall', '/cache clean'].includes(command)) return null;
 
     if (!window.HeyCasaPWA) {
       return {
@@ -325,7 +325,8 @@ const App = (() => {
     }
 
     if (command === '/install') return window.HeyCasaPWA.install();
-    return window.HeyCasaPWA.uninstall();
+    if (command === '/uninstall') return window.HeyCasaPWA.uninstall();
+    return window.HeyCasaPWA.cleanCache();
   }
 
   // ── UTILS ─────────────────────────────────

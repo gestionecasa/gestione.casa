@@ -1,10 +1,10 @@
 // assets/pwa.js — PWA install banner + service worker registration
 
 (() => {
+  const DISMISS_KEY = 'pwa-banner-dismissed';
   const MOBILE_QUERY = '(max-width: 768px)';
 
   let deferredPrompt = null;
-  let dismissedThisSession = false;
 
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
@@ -33,8 +33,23 @@
 
   function showBanner() {
     const { banner } = elements();
-    if (!banner || dismissedThisSession || isStandalone() || !isMobile()) return;
+    if (!banner || isStandalone() || !isMobile()) return;
+    document.documentElement.classList.remove('pwa-banner-dismissed');
     banner.classList.remove('hidden');
+  }
+
+  function setDismissed() {
+    try {
+      localStorage.setItem(DISMISS_KEY, '1');
+    } catch (_) {}
+    document.documentElement.classList.add('pwa-banner-dismissed');
+  }
+
+  function clearDismissed() {
+    try {
+      localStorage.removeItem(DISMISS_KEY);
+    } catch (_) {}
+    document.documentElement.classList.remove('pwa-banner-dismissed');
   }
 
   function applyIOSCopy() {
@@ -49,7 +64,7 @@
   }
 
   async function installFromCommand() {
-    dismissedThisSession = false;
+    clearDismissed();
 
     if (isStandalone()) {
       hideBanner();
@@ -111,7 +126,7 @@
   }
 
   async function uninstallFromCommand() {
-    dismissedThisSession = false;
+    clearDismissed();
 
     const message = isIOS
       ? 'iOS non permette a una pagina web di rimuovere una PWA. Tieni premuta l’icona di Hey Casa nella schermata Home e scegli "Rimuovi app".'
@@ -126,9 +141,39 @@
     };
   }
 
+  async function cleanCacheFromCommand() {
+    clearDismissed();
+
+    let deletedCaches = 0;
+    let unregisteredWorkers = 0;
+
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(key => caches.delete(key)));
+      deletedCaches = keys.length;
+    }
+
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map(registration => registration.unregister()));
+      unregisteredWorkers = registrations.length;
+    }
+
+    setTimeout(() => {
+      window.location.reload();
+    }, 900);
+
+    return {
+      tool: 'cache_clean',
+      toolResult: `${deletedCaches} cache · ${unregisteredWorkers} service worker`,
+      message: `Cache frontend pulita. Ho eliminato **${deletedCaches}** cache e deregistrato **${unregisteredWorkers}** service worker.\n\nRicarico la pagina tra un secondo per prendere gli asset freschi.`,
+    };
+  }
+
   window.HeyCasaPWA = {
     install: installFromCommand,
     uninstall: uninstallFromCommand,
+    cleanCache: cleanCacheFromCommand,
     showBanner,
     hideBanner,
   };
@@ -158,7 +203,7 @@
   });
 
   dismissBtn?.addEventListener('click', () => {
-    dismissedThisSession = true;
+    setDismissed();
     hideBanner();
   });
 

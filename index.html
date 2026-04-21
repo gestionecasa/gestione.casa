@@ -4,6 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hey Casa — Il tuo agente domestico</title>
+  <script>
+    (() => {
+      try {
+        if (localStorage.getItem('pwa-banner-dismissed') === '1') {
+          document.documentElement.classList.add('pwa-banner-dismissed');
+        }
+      } catch (_) {}
+    })();
+  </script>
   <link rel="stylesheet" href="assets/style.css">
   <link rel="icon" type="image/png" sizes="32x32" href="assets/images/icons/icon-96x96.png">
   <link rel="icon" type="image/png" sizes="192x192" href="assets/images/icons/icon-192x192.png">
@@ -80,20 +89,6 @@
     </div>
 
     <div class="input-zone">
-      <div class="pwa-banner" id="pwaBanner" role="complementary" aria-label="Installa l'app">
-        <img src="assets/images/logo.png" alt="Hey Casa" class="pwa-banner-logo" width="40" height="40">
-        <div class="pwa-banner-body">
-          <strong>Aggiungi Hey Casa</strong>
-          <span id="pwaBannerSub">Accesso rapido dalla home, funziona anche offline.</span>
-        </div>
-        <button class="pwa-install-btn" id="pwaInstallBtn">Installa</button>
-        <button class="pwa-dismiss-btn" id="pwaDismissBtn" aria-label="Chiudi">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
-
       <div class="suggestions-row" id="suggestionsRow"></div>
 
       <div class="input-bar">
@@ -122,6 +117,20 @@
 
       <div class="input-hint" id="inputHint">
         Premi <kbd>Enter</kbd> per inviare &nbsp;·&nbsp; <kbd>Shift+Enter</kbd> per a capo &nbsp;·&nbsp; <kbd>🎙</kbd> per parlare
+      </div>
+
+      <div class="pwa-banner" id="pwaBanner" role="complementary" aria-label="Installa l'app">
+        <img src="assets/images/logo.png" alt="Hey Casa" class="pwa-banner-logo" width="40" height="40">
+        <div class="pwa-banner-body">
+          <strong>Aggiungi Hey Casa</strong>
+          <span id="pwaBannerSub">Accesso rapido dalla home, funziona anche offline.</span>
+        </div>
+        <button class="pwa-install-btn" id="pwaInstallBtn">Installa</button>
+        <button class="pwa-dismiss-btn" id="pwaDismissBtn" aria-label="Chiudi">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
       </div>
     </div>
 

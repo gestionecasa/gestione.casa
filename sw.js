@@ -1,5 +1,5 @@
 // sw.js — Service Worker per Hey Casa PWA
-const CACHE = 'casa-v2';
+const CACHE = 'casa-v4';
 const ASSETS = [
   './',
   './index.html',
