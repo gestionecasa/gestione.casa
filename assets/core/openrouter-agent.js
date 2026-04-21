@@ -2,7 +2,7 @@
 
 const OpenRouterAgent = (() => {
 
-  const MODEL = 'meta-llama/llama-3.2-3b-instruct:free';
+  const MODEL = 'google/gemma-3-4b-it:free';
 
   const SYSTEM = `Sei Casa, un assistente domestico intelligente e conversazionale.
 Aiuti l'utente a gestire la casa: luci e dispositivi smart, spese e bollette, scadenze e contratti, promemoria, bonus edilizi.
@@ -19,36 +19,40 @@ Se non sai qualcosa o non hai accesso ai dati reali della casa, dillo chiarament
 
   async function process(rawMsg) {
     const token = OpenRouterAuth.getToken();
-    if (!token) throw new Error('Non autenticato');
+    if (!token) return { message: 'Non sei autenticato. Accedi con OpenRouter dalla sidebar.' };
 
     history.push({ role: 'user', content: rawMsg });
     trimHistory();
 
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization':  `Bearer ${token}`,
-        'Content-Type':   'application/json',
-        'HTTP-Referer':   window.location.origin,
-        'X-Title':        'Hey Casa',
-      },
-      body: JSON.stringify({
-        model:    MODEL,
-        messages: [
-          { role: 'system', content: SYSTEM },
-          ...history,
-        ],
-      }),
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err?.error?.message || `HTTP ${res.status}`);
+    let res, data;
+    try {
+      res  = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type':  'application/json',
+          'HTTP-Referer':  window.location.origin,
+          'X-Title':       'Hey Casa',
+        },
+        body: JSON.stringify({
+          model:    MODEL,
+          messages: [{ role: 'system', content: SYSTEM }, ...history],
+        }),
+      });
+      data = await res.json();
+    } catch (err) {
+      history.pop();
+      return { message: `Errore di rete: ${err.message}` };
     }
 
-    const data    = await res.json();
-    const content = data.choices?.[0]?.message?.content ?? '(nessuna risposta)';
+    if (!res.ok) {
+      history.pop();
+      const msg = data?.error?.message || `Errore ${res.status}`;
+      if (res.status === 429) return { message: `Il modello è momentaneamente sovraccarico (429). Riprova tra qualche secondo.\n\nModello usato: \`${MODEL}\`` };
+      return { message: `Errore OpenRouter: ${msg}` };
+    }
 
+    const content = data.choices?.[0]?.message?.content ?? '(nessuna risposta)';
     history.push({ role: 'assistant', content });
     return { message: content };
   }
