@@ -370,8 +370,8 @@ const App = (() => {
     await sleep(500);
     removeEl(typingEl);
 
-    // Step 2 — process (fake agent does its own delay)
-    const result = await FakeAgent.process(text);
+    // Step 2 — process via active agent
+    const result = await activeAgent().process(text);
 
     // Step 3 — if tool call, show spinner briefly
     if (result.tool) {
@@ -478,9 +478,10 @@ const App = (() => {
 
     clearBtn.addEventListener('click', () => {
       messagesEl.innerHTML = '';
+      OpenRouterAgent.clearHistory();
       renderWelcome();
       renderSuggestions(INIT_SUGGESTIONS);
-      agentTagline.textContent = 'Pronto — cosa vuoi fare?';
+      authBadge();
       $('agentAvatar').classList.remove('thinking', 'listening');
     });
 
@@ -584,7 +585,74 @@ const App = (() => {
     rec.onerror = () => stopListening();
   }
 
-  return { init };
+  // ── AGENT SWITCH ──────────────────────────
+  // Returns the active agent based on auth state
+  function activeAgent() {
+    return OpenRouterAuth.isAuthenticated() ? OpenRouterAgent : FakeAgent;
+  }
+
+  function authBadge() {
+    if (OpenRouterAuth.isAuthenticated()) {
+      agentTagline.innerHTML = `Connesso a OpenRouter &nbsp;<button class="logout-btn" id="logoutBtn">Esci</button>`;
+      $('logoutBtn')?.addEventListener('click', () => {
+        OpenRouterAuth.logout();
+        OpenRouterAgent.clearHistory();
+        agentTagline.textContent = 'Pronto — cosa vuoi fare?';
+        showLoginScreen();
+      }, { once: true });
+    } else {
+      agentTagline.textContent = 'Modalità demo — cosa vuoi fare?';
+    }
+  }
+
+  // ── LOGIN SCREEN ───────────────────────────
+  function showLoginScreen() {
+    const screen = $('loginScreen');
+    if (!screen) return;
+    screen.hidden = false;
+
+    $('loginOAuthBtn').addEventListener('click', () => {
+      OpenRouterAuth.startOAuth();
+    }, { once: true });
+
+    $('loginApiKeyBtn').addEventListener('click', () => {
+      const key = $('loginApiKey').value.trim();
+      if (!key) { $('loginApiKey').focus(); return; }
+      OpenRouterAuth.saveApiKey(key);
+      screen.hidden = true;
+      authBadge();
+    }, { once: true });
+
+    $('loginApiKey').addEventListener('keydown', e => {
+      if (e.key === 'Enter') $('loginApiKeyBtn').click();
+    });
+
+    $('loginDemoBtn').addEventListener('click', () => {
+      screen.hidden = true;
+      agentTagline.textContent = 'Modalità demo — cosa vuoi fare?';
+    }, { once: true });
+  }
+
+  return { init, showLoginScreen, authBadge };
 })();
 
-document.addEventListener('DOMContentLoaded', () => App.init());
+document.addEventListener('DOMContentLoaded', async () => {
+  // Handle OAuth callback — ?code= in URL
+  const code = new URLSearchParams(location.search).get('code');
+  if (code) {
+    history.replaceState({}, '', location.pathname);
+    try {
+      await OpenRouterAuth.handleCallback(code);
+    } catch (err) {
+      console.error('OAuth callback error:', err);
+    }
+  }
+
+  App.init();
+
+  if (!OpenRouterAuth.isAuthenticated()) {
+    App.showLoginScreen();
+  } else {
+    App.authBadge();
+  }
+});
