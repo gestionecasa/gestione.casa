@@ -96,13 +96,26 @@ const App = (() => {
 
     let found = [];
     try {
-      found = await BrokerDiscovery.scan(null, appendLog);
+      const TIMEOUT_MS = 60_000;
+      const timeoutP = new Promise(res => setTimeout(() => res('__timeout__'), TIMEOUT_MS));
+      console.log('[Discovery] avvio scan…');
+      const race = await Promise.race([BrokerDiscovery.scan(null, appendLog), timeoutP]);
+      if (race === '__timeout__') {
+        console.warn('[Discovery] scan timeout — nascondo barra');
+        BrokerDiscovery.abort();
+        hideBar();
+        return;
+      }
+      found = race ?? [];
+      console.log('[Discovery] scan completata, trovati:', found.length);
     } catch (err) {
+      console.error('[Discovery] errore:', err);
       appendLog(`Errore: ${err.message}`);
     }
 
     // Se interrotto o nessun broker → nascondi barra silenziosamente
     const scanStatus = BrokerDiscovery.getStatus();
+    console.log('[Discovery] status finale:', scanStatus.status, 'found:', found.length);
     if (found.length === 0 || scanStatus.status === 'aborted') {
       hideBar();
       return;
