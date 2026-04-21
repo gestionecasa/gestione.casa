@@ -4,6 +4,27 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hey Casa — Il tuo agente domestico</title>
+  <script>
+    (() => {
+      const isStandalone =
+        window.matchMedia('(display-mode: standalone)').matches ||
+        window.navigator.standalone === true;
+      const isMobile = window.matchMedia('(max-width: 768px)').matches;
+      let recentlyDismissed = false;
+
+      try {
+        const dismissedAt = localStorage.getItem('pwa-banner-dismissed-at');
+        recentlyDismissed =
+          dismissedAt && Date.now() - Number(dismissedAt) < 24 * 60 * 60 * 1000;
+      } catch (_) {}
+
+      if (isStandalone || recentlyDismissed) {
+        document.documentElement.classList.add('pwa-banner-suppressed');
+      } else if (isMobile) {
+        document.documentElement.classList.add('pwa-banner-mobile');
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="assets/style.css">
   <link rel="icon" type="image/png" sizes="32x32" href="assets/images/icons/icon-96x96.png">
   <link rel="icon" type="image/png" sizes="192x192" href="assets/images/icons/icon-192x192.png">

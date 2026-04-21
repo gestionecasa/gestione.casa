@@ -254,6 +254,17 @@ const App = (() => {
     suggestionsRow.innerHTML = '';
     addUserMessage(text);
 
+    const commandResult = await handleLocalCommand(text);
+    if (commandResult) {
+      addAgentMessage(commandResult);
+      renderSuggestions(['/install', '/uninstall', 'Stato casa', 'Scadenze imminenti']);
+
+      agentTagline.textContent = 'Pronto — cosa vuoi fare?';
+      $('agentAvatar').classList.remove('thinking');
+      isBusy = false;
+      return;
+    }
+
     // Step 1 — typing indicator
     const typingEl = showTyping();
     await sleep(500);
@@ -299,6 +310,22 @@ const App = (() => {
     if (/tv|televi/.test(m))
       return ['Accendi le luci', 'Spegni tutto', "Com'è messa casa?", 'Temperatura'];
     return ['Accendi le luci', 'Stato lavatrice', 'Spese questo mese', 'Scadenze imminenti'];
+  }
+
+  async function handleLocalCommand(text) {
+    const command = text.trim().toLowerCase();
+    if (command !== '/install' && command !== '/uninstall') return null;
+
+    if (!window.HeyCasaPWA) {
+      return {
+        tool: 'pwa_command',
+        toolResult: 'non disponibile',
+        message: 'La gestione PWA non e ancora pronta. Riprova tra qualche secondo.',
+      };
+    }
+
+    if (command === '/install') return window.HeyCasaPWA.install();
+    return window.HeyCasaPWA.uninstall();
   }
 
   // ── UTILS ─────────────────────────────────
