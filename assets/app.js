@@ -218,13 +218,18 @@ const App = (() => {
       console.log('broker salvato in localStorage');
       agentTagline.textContent = `Connessione a ${broker.name}…`;
       const startedAt = performance.now();
-      await McpLayer.initFromBroker(broker.url, broker.haToken || null, broker.id);
+      const initInfo = await McpLayer.initFromBroker(broker.url, broker.haToken || null, broker.id);
       const elapsed = Math.round(performance.now() - startedAt);
       const tools = McpLayer.getTools();
       console.log(`MCP init completato in ${elapsed}ms`);
+      console.log('init info:', initInfo);
       console.log('tools dopo:', tools.map(t => t.function?.name));
       agentTagline.textContent = `Connesso — ${broker.name}`;
-      addAgentMessage({ message: `Connesso a **${broker.name}** su \`${broker.url}\`. ${tools.length} tool disponibili.` });
+      closeDiscoveryUi();
+      const note = broker.id === 'homeassistant' && initInfo.dynamicTools === 0
+        ? `\n\nNon ho creato tool dinamici Home Assistant. Controlla token e CORS: l'origine corrente è \`${location.origin}\`.`
+        : '';
+      addAgentMessage({ message: `Connesso a **${broker.name}** su \`${broker.url}\`. ${tools.length} tool disponibili.${note}` });
       return { ok: true, tools: tools.length };
     } catch (e) {
       console.error('[BrokerConnect] errore connessione:', e);
@@ -234,6 +239,17 @@ const App = (() => {
     } finally {
       console.groupEnd();
     }
+  }
+
+  function closeDiscoveryUi() {
+    const bar = $('discoveryBar');
+    const logPanel = $('discoveryLog');
+    if (BrokerDiscovery.getStatus().status === 'running') BrokerDiscovery.abort();
+    if (bar) {
+      bar.hidden = true;
+      bar.style.display = 'none';
+    }
+    if (logPanel) logPanel.hidden = true;
   }
 
   function saveBroker(broker) {
@@ -428,7 +444,8 @@ const App = (() => {
     if (result._brokerFound) {
       el.querySelectorAll('.broker-connect-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
-          const broker = result._brokerFound[parseInt(btn.dataset.idx)];
+          const broker = await prepareBrokerForConnect(result._brokerFound[parseInt(btn.dataset.idx)]);
+          if (!broker) return;
           const row = btn.closest('.broker-connect-row');
           const allBtns = row.querySelectorAll('.broker-connect-btn');
           console.log('[BrokerConnect] click bottone:', { index: btn.dataset.idx, broker });
@@ -445,7 +462,7 @@ const App = (() => {
             btn.textContent = `${broker.icon ?? ''} ${broker.name} — errore, riprova`;
             btn.classList.add('is-error');
           }
-        }, { once: true });
+        });
       });
     }
     messagesEl.appendChild(el);
@@ -457,6 +474,34 @@ const App = (() => {
       `<button class="broker-connect-btn disc-bar-btn" data-idx="${i}">${esc(b.icon)} ${esc(b.name)}<span>${esc(b.ip)}:${esc(String(b.port ?? ''))}</span></button>`
     ).join('');
     return `<div class="broker-connect-row">${btns}</div>`;
+  }
+
+  async function prepareBrokerForConnect(rawBroker) {
+    const broker = normalizeBroker(rawBroker);
+    if (broker.id !== 'homeassistant' || broker.haToken) return broker;
+
+    console.warn('[BrokerConnect] Home Assistant richiede un Long-Lived Access Token per creare tool dinamici');
+    const token = window.prompt(
+      'Incolla il Long-Lived Access Token di Home Assistant.\n\nLo trovi in Home Assistant: profilo utente → Security/Sicurezza → Long-Lived Access Tokens.'
+    );
+    if (!token || !token.trim()) {
+      console.warn('[BrokerConnect] connessione Home Assistant annullata: token mancante');
+      return null;
+    }
+    return { ...broker, haToken: token.trim() };
+  }
+
+  function normalizeBroker(broker) {
+    if (!broker) return broker;
+    if (broker.ip !== '0.0.0.0') return { ...broker };
+    const host = isLocalhost() ? '127.0.0.1' : location.hostname;
+    const normalized = {
+      ...broker,
+      ip: host,
+      url: `http://${host}:${broker.port}`,
+    };
+    console.warn('[BrokerConnect] normalizzato broker 0.0.0.0:', { before: broker, after: normalized });
+    return normalized;
   }
 
   function buildToolCard(result) {

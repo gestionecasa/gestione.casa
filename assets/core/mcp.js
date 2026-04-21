@@ -207,6 +207,8 @@ IMPORTANTE: prima di sbloccare chiedere sempre conferma esplicita all'utente.`,
   async function initFromBroker(brokerUrl, brokerToken, brokerType = 'homeassistant') {
     console.groupCollapsed('[MCP] initFromBroker');
     console.log({ brokerUrl, brokerType, hasToken: !!brokerToken });
+    let entitiesLoaded = 0;
+    let entityLoadError = null;
     registry.brokerUrl   = brokerUrl;
     registry.brokerToken = brokerToken;
     registry.brokerType  = brokerType;
@@ -222,8 +224,14 @@ IMPORTANTE: prima di sbloccare chiedere sempre conferma esplicita all'utente.`,
         console.log('[MCP] risposta /api/states:', res.status, res.statusText);
         if (!res.ok) throw new Error(`Home Assistant /api/states HTTP ${res.status}`);
         entities = await res.json();
+        entitiesLoaded = Array.isArray(entities) ? entities.length : 0;
       } catch (err) {
+        entityLoadError = err.message;
         console.warn('[MCP] impossibile caricare entità da HA:', err.message);
+        console.warn('[MCP] se è un errore CORS, configura Home Assistant:', {
+          origin: location.origin,
+          configuration: `http:\n  cors_allowed_origins:\n    - ${location.origin}`
+        });
       }
 
       if (Array.isArray(entities)) {
@@ -254,6 +262,14 @@ IMPORTANTE: prima di sbloccare chiedere sempre conferma esplicita all'utente.`,
       console.warn('[MCP] impossibile salvare registry:', err.message);
     }
     console.groupEnd();
+    return {
+      brokerUrl,
+      brokerType,
+      dynamicTools: registry.dynamic.length,
+      entitiesLoaded,
+      entityLoadError,
+      hasToken: !!brokerToken,
+    };
   }
 
   function loadFromCache() {
@@ -292,15 +308,31 @@ IMPORTANTE: prima di sbloccare chiedere sempre conferma esplicita all'utente.`,
   async function executeTool(name, input) {
     const { brokerUrl, brokerToken } = registry;
 
-    const ha = (path, method = 'GET', body = null) =>
-      fetch(`${brokerUrl}/api/${path}`, {
-        method,
-        headers: {
-          Authorization: `Bearer ${brokerToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: body ? JSON.stringify(body) : null
-      }).then(r => r.json());
+    const ha = async (path, method = 'GET', body = null) => {
+      const url = `${brokerUrl}/api/${path}`;
+      console.log('[MCP][HA] request', { method, url, hasToken: !!brokerToken, origin: location.origin });
+      try {
+        const res = await fetch(url, {
+          method,
+          headers: {
+            Authorization: `Bearer ${brokerToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: body ? JSON.stringify(body) : null
+        });
+        console.log('[MCP][HA] response', { url, status: res.status, statusText: res.statusText });
+        if (!res.ok) throw new Error(`Home Assistant HTTP ${res.status} su ${url}`);
+        return res.json();
+      } catch (err) {
+        console.error('[MCP][HA] fetch fallita', {
+          url,
+          origin: location.origin,
+          error: err.message,
+          hint: `Se il browser segnala CORS, aggiungi ${location.origin} a http.cors_allowed_origins in Home Assistant.`
+        });
+        throw err;
+      }
+    };
 
     console.log(`[MCP] executeTool: ${name}`, input);
 

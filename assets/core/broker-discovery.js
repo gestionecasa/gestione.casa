@@ -93,6 +93,13 @@ const BrokerDiscovery = (() => {
     return `${p[0]}.${p[1]}.${p[2]}`;
   }
 
+  function fixedProbeIps() {
+    const ips = ['127.0.0.1'];
+    const h = location.hostname;
+    if (h && h !== 'localhost' && h !== '127.0.0.1') ips.unshift(h);
+    return [...new Set(ips)];
+  }
+
   function withTimeout(ms = 500) {
     const ctrl = new AbortController();
     const tid = setTimeout(() => ctrl.abort(), ms);
@@ -257,7 +264,7 @@ const BrokerDiscovery = (() => {
     log('--- avvio scansione broker ---');
 
     try {
-      const fixed = await probeFixed(['0.0.0.0', '127.0.0.1'], log);
+      const fixed = await probeFixed(fixedProbeIps(), log);
       if (fixed.length > 0) {
         state.found = dedupe(fixed);
         log(`--- completata: ${state.found.length} broker trovati (localhost) ---`);
