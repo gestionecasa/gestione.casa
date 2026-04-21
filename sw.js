@@ -5,8 +5,12 @@ const ASSETS = [
   './index.html',
   './assets/style.css',
   './assets/app.js',
+  './assets/pwa.js',
   './assets/core/fake-agent.js',
   './assets/images/logo.png',
+  './assets/images/app-logo.png',
+  './assets/images/icons/icon-192x192.png',
+  './assets/images/icons/icon-512x512.png',
   './manifest.json',
 ];
 
