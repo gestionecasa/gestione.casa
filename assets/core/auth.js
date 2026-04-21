@@ -38,24 +38,36 @@ const OpenRouterAuth = (() => {
   }
 
   async function handleCallback(code) {
+    console.log('[Auth] handleCallback — code:', code);
+
     const verifier = sessionStorage.getItem(VERIFIER_KEY);
-    if (!verifier) throw new Error('PKCE verifier mancante — riprova il login');
+    console.log('[Auth] verifier from sessionStorage:', verifier ? '✓ presente' : '✗ MANCANTE');
+
+    const body = verifier
+      ? { code, code_verifier: verifier }
+      : { code }; // fallback senza PKCE se il verifier è andato perso
 
     const res = await fetch('https://openrouter.ai/api/v1/auth/keys', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, code_verifier: verifier }),
+      body: JSON.stringify(body),
     });
 
+    const data = await res.json().catch(() => ({}));
+    console.log('[Auth] risposta OpenRouter:', res.status, data);
+
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err?.error?.message || `Token exchange fallito (${res.status})`);
+      throw new Error(data?.error?.message || `Token exchange fallito (${res.status})`);
     }
 
-    const { key } = await res.json();
+    // OpenRouter può rispondere con { key } oppure { token } o { api_key }
+    const token = data.key ?? data.token ?? data.api_key ?? null;
+    if (!token) throw new Error('Risposta inattesa: nessun token nel body → ' + JSON.stringify(data));
+
     sessionStorage.removeItem(VERIFIER_KEY);
-    saveToken(key);
-    return key;
+    saveToken(token);
+    console.log('[Auth] token salvato ✓');
+    return token;
   }
 
   // ── API key diretta ─────────────────────────

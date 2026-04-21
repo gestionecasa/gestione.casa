@@ -2,7 +2,7 @@
 
 const OpenRouterAgent = (() => {
 
-  const MODEL = 'anthropic/claude-sonnet-4-5';
+  const MODEL = 'meta-llama/llama-3.2-3b-instruct:free';
 
   const SYSTEM = `Sei Casa, un assistente domestico intelligente e conversazionale.
 Aiuti l'utente a gestire la casa: luci e dispositivi smart, spese e bollette, scadenze e contratti, promemoria, bonus edilizi.

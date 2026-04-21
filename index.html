@@ -27,37 +27,6 @@
   <link rel="apple-touch-icon" sizes="152x152" href="assets/images/icons/icon-152x152.png">
 </head>
 <body>
-<!-- ── LOGIN SCREEN ──────────────────────────── -->
-<div class="login-screen" id="loginScreen" hidden>
-  <div class="login-card">
-    <img src="assets/images/logo.png" alt="Hey Casa" class="login-logo">
-    <h1 class="login-title"><span class="hey-word">Hey</span> Casa</h1>
-    <p class="login-sub">Connetti il tuo account <strong>OpenRouter</strong> per usare l'intelligenza artificiale.</p>
-
-    <div class="login-section" id="loginOAuthSection">
-      <button class="login-btn-primary" id="loginOAuthBtn">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="flex-shrink:0"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
-        Accedi con OpenRouter
-      </button>
-    </div>
-
-    <div class="login-divider"><span>oppure</span></div>
-
-    <div class="login-section">
-      <p class="login-label">Incolla la tua API key OpenRouter</p>
-      <div class="login-key-row">
-        <input type="password" id="loginApiKey" class="login-key-input" placeholder="sk-or-v1-…" autocomplete="off" spellcheck="false">
-        <button class="login-btn-secondary" id="loginApiKeyBtn">Usa</button>
-      </div>
-      <p class="login-hint">
-        Ottieni una key su <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a>
-      </p>
-    </div>
-
-    <button class="login-demo-link" id="loginDemoBtn">Continua in modalità demo (senza AI)</button>
-  </div>
-</div>
-
 <div class="layout">
 
   <!-- ── SIDEBAR ─────────────────────────── -->
@@ -81,6 +50,18 @@
     <div class="sidebar-section">
       <div class="sidebar-label">Spese questo mese</div>
       <div class="expenses-mini" id="expensesMini"></div>
+    </div>
+
+    <!-- ── AUTH ─────────────────────────── -->
+    <div class="sidebar-auth" id="sidebarAuth">
+      <button class="sidebar-auth-btn" id="sidebarLoginBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+          <polyline points="10 17 15 12 10 7"/>
+          <line x1="15" y1="12" x2="3" y2="12"/>
+        </svg>
+        Accedi con OpenRouter
+      </button>
     </div>
 
   </aside>

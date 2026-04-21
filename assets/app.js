@@ -31,6 +31,7 @@ const App = (() => {
     renderWelcome();
     renderSuggestions(INIT_SUGGESTIONS);
     renderSidebar();
+    renderAuthWidget();
     bindEvents();
     initMic();
     updateInputLayout();
@@ -586,73 +587,69 @@ const App = (() => {
   }
 
   // ── AGENT SWITCH ──────────────────────────
-  // Returns the active agent based on auth state
   function activeAgent() {
     return OpenRouterAuth.isAuthenticated() ? OpenRouterAgent : FakeAgent;
   }
 
-  function authBadge() {
+  // ── SIDEBAR AUTH WIDGET ────────────────────
+  function renderAuthWidget() {
+    const authEl = $('sidebarAuth');
+    if (!authEl) return;
+
     if (OpenRouterAuth.isAuthenticated()) {
-      agentTagline.innerHTML = `Connesso a OpenRouter &nbsp;<button class="logout-btn" id="logoutBtn">Esci</button>`;
-      $('logoutBtn')?.addEventListener('click', () => {
+      authEl.innerHTML = `
+        <div class="sidebar-auth-info">
+          <span class="sidebar-auth-dot"></span>
+          <span class="sidebar-auth-label">OpenRouter connesso</span>
+        </div>
+        <button class="sidebar-auth-logout" id="sidebarLogoutBtn">Esci</button>`;
+      $('sidebarLogoutBtn').addEventListener('click', () => {
         OpenRouterAuth.logout();
         OpenRouterAgent.clearHistory();
+        renderAuthWidget();
         agentTagline.textContent = 'Pronto — cosa vuoi fare?';
-        showLoginScreen();
       }, { once: true });
+      agentTagline.textContent = 'Connesso a OpenRouter';
     } else {
-      agentTagline.textContent = 'Modalità demo — cosa vuoi fare?';
+      authEl.innerHTML = `
+        <button class="sidebar-auth-btn" id="sidebarLoginBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+            <polyline points="10 17 15 12 10 7"/>
+            <line x1="15" y1="12" x2="3" y2="12"/>
+          </svg>
+          Accedi con OpenRouter
+        </button>`;
+      $('sidebarLoginBtn').addEventListener('click', () => {
+        OpenRouterAuth.startOAuth();
+      }, { once: true });
     }
   }
 
-  // ── LOGIN SCREEN ───────────────────────────
-  function showLoginScreen() {
-    const screen = $('loginScreen');
-    if (!screen) return;
-    screen.hidden = false;
-
-    $('loginOAuthBtn').addEventListener('click', () => {
-      OpenRouterAuth.startOAuth();
-    }, { once: true });
-
-    $('loginApiKeyBtn').addEventListener('click', () => {
-      const key = $('loginApiKey').value.trim();
-      if (!key) { $('loginApiKey').focus(); return; }
-      OpenRouterAuth.saveApiKey(key);
-      screen.hidden = true;
-      authBadge();
-    }, { once: true });
-
-    $('loginApiKey').addEventListener('keydown', e => {
-      if (e.key === 'Enter') $('loginApiKeyBtn').click();
-    });
-
-    $('loginDemoBtn').addEventListener('click', () => {
-      screen.hidden = true;
-      agentTagline.textContent = 'Modalità demo — cosa vuoi fare?';
-    }, { once: true });
-  }
-
-  return { init, showLoginScreen, authBadge };
+  return { init, renderAuthWidget };
 })();
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // Handle OAuth callback — ?code= in URL
   const code = new URLSearchParams(location.search).get('code');
   if (code) {
     history.replaceState({}, '', location.pathname);
+    // Init UI first so the user sees the app, not a blank page
+    App.init();
+    // Show spinner in tagline while exchanging the code
+    const tagline = document.getElementById('agentTagline');
+    if (tagline) tagline.textContent = 'Connessione a OpenRouter…';
     try {
       await OpenRouterAuth.handleCallback(code);
+      App.renderAuthWidget();
     } catch (err) {
-      console.error('OAuth callback error:', err);
+      console.error('[Auth] callback error:', err);
+      if (tagline) tagline.textContent = `Auth error: ${err.message}`;
+      // Mostra l'errore anche nel widget sidebar
+      const authEl = document.getElementById('sidebarAuth');
+      if (authEl) authEl.innerHTML = `<p class="sidebar-auth-error" title="${err.message}">⚠ Login fallito — <button class="sidebar-auth-btn" id="sidebarLoginBtn" style="display:inline;padding:2px 8px">Riprova</button></p>`;
+      document.getElementById('sidebarLoginBtn')?.addEventListener('click', () => OpenRouterAuth.startOAuth(), { once: true });
     }
-  }
-
-  App.init();
-
-  if (!OpenRouterAuth.isAuthenticated()) {
-    App.showLoginScreen();
   } else {
-    App.authBadge();
+    App.init();
   }
 });
