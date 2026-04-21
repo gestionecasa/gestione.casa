@@ -2,6 +2,8 @@
   "name": "Hey Casa — Agente Domestico",
   "short_name": "Hey Casa",
   "description": "Il tuo agente domestico. Controlla luci, bollette e scadenze con una semplice chat.",
+  "id": "./?app=hey-casa",
+  "version": "0.1.1",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
