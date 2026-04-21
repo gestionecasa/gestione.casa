@@ -23,20 +23,36 @@ const BrokerDiscovery = (() => {
     completedAt: null,
   };
 
+  const listeners = new Set();
+
   function ts() {
     const d = new Date();
     return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}:${d.getSeconds().toString().padStart(2,'0')}`;
   }
 
-  // log è sempre iniettato dall'esterno (scan lo costruisce)
-  // Viene anche memorizzato nel buffer interno
+  function notify(type, data = {}) {
+    const snapshot = getStatus();
+    listeners.forEach(cb => {
+      try { cb({ type, status: snapshot, ...data }); } catch {}
+    });
+  }
+
+  function onChange(cb) {
+    if (typeof cb !== 'function') return () => {};
+    listeners.add(cb);
+    return () => listeners.delete(cb);
+  }
+
+  function pushLog(line, externalCb) {
+    const entry = `[${ts()}] ${line}`;
+    state.logs.push(entry);
+    if (state.logs.length > 500) state.logs.shift();
+    if (externalCb) externalCb(entry);
+    notify('log', { line: entry });
+  }
+
   function makeLogger(externalCb) {
-    return line => {
-      const entry = `[${ts()}] ${line}`;
-      state.logs.push(entry);
-      if (state.logs.length > 500) state.logs.shift();
-      if (externalCb) externalCb(entry);
-    };
+    return line => pushLog(line, externalCb);
   }
 
   // ── WebRTC: rileva IP locale ───────────────
@@ -142,6 +158,7 @@ const BrokerDiscovery = (() => {
         scanned++;
         state.progress = scanned / total;
         if (onProgress) onProgress(state.progress, [...state.found]);
+        notify('progress');
       }));
     }
 
@@ -154,14 +171,17 @@ const BrokerDiscovery = (() => {
   function abort() {
     if (state.status !== 'running') return false;
     state.aborted = true;
+    pushLog('Interruzione richiesta');
+    notify('abort');
     return true;
   }
 
   function getStatus() {
     return {
       status:      state.status,
+      aborted:     state.aborted,
       progress:    Math.round(state.progress * 100),
-      found:       state.found.map(b => ({ name: b.name, ip: b.ip, port: b.port, url: b.url })),
+      found:       state.found.map(b => ({ id: b.id, name: b.name, ip: b.ip, port: b.port, url: b.url, icon: b.icon })),
       logLines:    state.logs.length,
       startedAt:   state.startedAt,
       completedAt: state.completedAt,
@@ -176,6 +196,7 @@ const BrokerDiscovery = (() => {
     state.status = 'idle'; state.aborted = false; state.found = [];
     state.logs = []; state.progress = 0;
     state.startedAt = state.completedAt = null;
+    notify('reset');
   }
 
   async function scan(onProgress, onLog) {
@@ -184,6 +205,7 @@ const BrokerDiscovery = (() => {
     resetState();
     state.status    = 'running';
     state.startedAt = new Date().toISOString();
+    notify('start');
 
     const log = makeLogger(onLog); // unico logger, propaga anche a onLog
     log('--- avvio scansione broker ---');
@@ -195,6 +217,7 @@ const BrokerDiscovery = (() => {
         log(`--- completata: ${state.found.length} broker trovati (localhost) ---`);
         state.status = state.aborted ? 'aborted' : 'completed';
         state.completedAt = new Date().toISOString();
+        notify(state.status);
         return state.found;
       }
 
@@ -219,6 +242,7 @@ const BrokerDiscovery = (() => {
 
     state.status      = state.aborted ? 'aborted' : 'completed';
     state.completedAt = new Date().toISOString();
+    notify(state.status);
     return state.found;
   }
 
@@ -232,5 +256,5 @@ const BrokerDiscovery = (() => {
     });
   }
 
-  return { scan, abort, getStatus, getLogs, resetState, BROKERS };
+  return { scan, abort, getStatus, getLogs, resetState, onChange, BROKERS };
 })();

@@ -18,6 +18,9 @@ const App = (() => {
 
   let isBusy = false;
   const sidebarRevealed = new Set(); // keys of sidebar values already revealed
+  let discoveryUiBound = false;
+  let discoveryLogLines = new Set();
+  let discoveryHandledCompletion = null;
 
   const INIT_SUGGESTIONS = [
     'Hey Casa, accendi le luci del soggiorno',
@@ -34,6 +37,7 @@ const App = (() => {
     renderSidebar();
     renderAuthWidget();
     bindEvents();
+    bindDiscoveryUi();
     initMic();
     updateInputLayout();
     runDiscovery();
@@ -53,100 +57,127 @@ const App = (() => {
   function runDiscovery() {
     if (!isLocalContext()) return;
     if (getSavedBroker()) return;
-    showDiscoveryBar();
+    showDiscoveryBar({ autoStart: true });
   }
 
-  // Mostra la barra e gestisce il ciclo completo di una scansione.
-  // Può essere chiamata dall'init O dal tool MCP start_broker_scan.
-  // Se una scan è già in corso la aggancia senza riavviarla.
-  async function showDiscoveryBar() {
-    const bar        = $('discoveryBar');
-    const spinner    = $('discoveryBarSpinner');
-    const textEl     = $('discoveryBarText');
-    const actionsEl  = $('discoveryBarActions');
+  function bindDiscoveryUi() {
+    if (discoveryUiBound) return;
+    discoveryUiBound = true;
+
     const closeBtn   = $('discoveryBarClose');
     const detailsBtn = $('discoveryBarDetails');
     const logPanel   = $('discoveryLog');
     const logPre     = $('discoveryLogPre');
 
-    // Evita doppia istanza se barra già visibile
-    if (!bar.hidden) return;
-
-    function appendLog(line) {
-      logPre.textContent += `${line}\n`;
-      if (!logPanel.hidden) logPre.scrollTop = logPre.scrollHeight;
-    }
-
-    function hideBar() {
-      bar.hidden = true;
-      logPanel.hidden = true;
-    }
-
     closeBtn.addEventListener('click', () => {
-      BrokerDiscovery.abort();
-      hideBar();
-    }, { once: true });
+      const s = BrokerDiscovery.getStatus();
+      if (s.status === 'running') {
+        BrokerDiscovery.abort();
+        return;
+      }
+      $('discoveryBar').hidden = true;
+      logPanel.hidden = true;
+    });
 
     detailsBtn.addEventListener('click', () => {
       const open = !logPanel.hidden;
       logPanel.hidden = open;
-      detailsBtn.textContent = open ? 'vedi dettagli' : 'nascondi';
+      detailsBtn.textContent = open ? 'vedi log' : 'nascondi log';
       if (!open) logPre.scrollTop = logPre.scrollHeight;
     });
 
-    bar.hidden = false;
-    spinner.style.display = '';
-    textEl.textContent = 'Ricerca di un broker di rete…';
-    actionsEl.innerHTML = '';
-    logPre.textContent = '';
-    BrokerDiscovery.getLogs().forEach(l => appendLog(l));
-
-    let found = [];
-    try {
-      const alreadyRunning = BrokerDiscovery.getStatus().status === 'running';
-
-      if (alreadyRunning) {
-        // Aspetta il completamento con polling
-        found = await new Promise((resolve) => {
-          const deadline = Date.now() + 60_000;
-          const tid = setInterval(() => {
-            const s = BrokerDiscovery.getStatus();
-            BrokerDiscovery.getLogs(500).forEach(l => {
-              if (!logPre.textContent.includes(l)) appendLog(l);
-            });
-            if (s.status !== 'running' || Date.now() > deadline) {
-              clearInterval(tid);
-              resolve(s.found.map(b => ({ ...b })));
-            }
-          }, 600);
-        });
-      } else {
-        const TIMEOUT_MS = 60_000;
-        const timeoutP = new Promise(res => setTimeout(() => res('__timeout__'), TIMEOUT_MS));
-        const race = await Promise.race([BrokerDiscovery.scan(null, appendLog), timeoutP]);
-        if (race === '__timeout__') {
-          BrokerDiscovery.abort();
-          hideBar();
-          return;
-        }
-        found = race ?? [];
+    BrokerDiscovery.onChange(evt => {
+      if (evt.type === 'reset') {
+        discoveryLogLines = new Set();
+        logPre.textContent = '';
+        discoveryHandledCompletion = null;
+        return;
       }
-    } catch (err) {
-      appendLog(`Errore: ${err.message}`);
-    }
+      if (evt.line) appendDiscoveryLog(evt.line);
+      syncDiscoveryBar(evt.status);
+    });
+  }
 
-    const scanStatus = BrokerDiscovery.getStatus();
-    if (found.length === 0 || scanStatus.status === 'aborted') {
-      hideBar();
+  function appendDiscoveryLog(line) {
+    const logPanel = $('discoveryLog');
+    const logPre   = $('discoveryLogPre');
+    if (discoveryLogLines.has(line)) return;
+    discoveryLogLines.add(line);
+    logPre.textContent += `${line}\n`;
+    if (!logPanel.hidden) logPre.scrollTop = logPre.scrollHeight;
+  }
+
+  function syncDiscoveryLogs() {
+    BrokerDiscovery.getLogs(500).forEach(appendDiscoveryLog);
+  }
+
+  function syncDiscoveryBar(status = BrokerDiscovery.getStatus()) {
+    const bar        = $('discoveryBar');
+    const spinner    = $('discoveryBarSpinner');
+    const textEl     = $('discoveryBarText');
+    const actionsEl  = $('discoveryBarActions');
+    const detailsBtn = $('discoveryBarDetails');
+    const logPanel   = $('discoveryLog');
+
+    syncDiscoveryLogs();
+    actionsEl.innerHTML = '';
+    detailsBtn.textContent = logPanel.hidden ? 'vedi log' : 'nascondi log';
+
+    if (status.status === 'idle') {
+      bar.hidden = true;
+      logPanel.hidden = true;
       return;
     }
 
-    hideBar();
-    const names = found.map(b => `${b.icon} **${b.name}**`).join(', ');
-    addAgentMessage({
-      message: `Ho trovato ${found.length === 1 ? 'un broker' : `${found.length} broker`} nella tua rete: ${names}.\n\nVuoi che mi connetta?`,
-      _brokerFound: found,
-    });
+    bar.hidden = false;
+
+    if (status.status === 'running') {
+      spinner.style.display = '';
+      textEl.textContent = status.aborted
+        ? 'Interruzione ricerca broker in corso…'
+        : status.progress > 0
+        ? `Ricerca broker in corso… ${status.progress}%`
+        : 'Ricerca broker in corso…';
+      return;
+    }
+
+    spinner.style.display = 'none';
+
+    if (status.status === 'aborted') {
+      textEl.textContent = 'Ricerca broker interrotta. Puoi vedere i log.';
+      return;
+    }
+
+    if (status.status === 'completed' && status.found.length === 0) {
+      textEl.textContent = 'Ricerca completata: nessun broker trovato. Puoi vedere i log.';
+      return;
+    }
+
+    if (status.status === 'completed' && status.found.length > 0) {
+      const key = `${status.startedAt}:${status.completedAt}:${status.found.length}`;
+      bar.hidden = true;
+      logPanel.hidden = true;
+      if (discoveryHandledCompletion === key) return;
+      discoveryHandledCompletion = key;
+      const found = status.found.map(b => ({ ...b, icon: brokerIcon(b) }));
+      const names = found.map(b => `${b.icon} **${b.name}**`).join(', ');
+      addAgentMessage({
+        message: `Ho trovato ${found.length === 1 ? 'un broker' : `${found.length} broker`} nella tua rete: ${names}.\n\nVuoi che mi connetta?`,
+        _brokerFound: found,
+      });
+    }
+  }
+
+  function brokerIcon(broker) {
+    return BrokerDiscovery.BROKERS.find(b => b.id === broker.id || b.name === broker.name)?.icon ?? '•';
+  }
+
+  function showDiscoveryBar({ autoStart = true } = {}) {
+    bindDiscoveryUi();
+    syncDiscoveryBar();
+    if (autoStart && BrokerDiscovery.getStatus().status !== 'running') {
+      BrokerDiscovery.scan();
+    }
   }
 
   function connectBroker(broker) {
