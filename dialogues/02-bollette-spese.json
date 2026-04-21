@@ -1,0 +1,55 @@
+{
+  "scenario": "Bollette e spese",
+  "description": "Dialoghi per interrogare e registrare le spese domestiche (luce, gas, acqua)",
+  "intents": ["query_expenses", "record_expense"],
+  "conversations": [
+    {
+      "id": "spese-01",
+      "title": "Quanto paghiamo di luce",
+      "turns": [
+        { "role": "user", "text": "quanto pagniamo di luce?" },
+        { "role": "agent", "tool": "query_expenses", "toolParams": {"categoria": "luce", "periodo": "corrente"}, "text": "Questo mese hai speso €87 di luce.\n\nNel 2026 siamo a €542 totali, in aumento dell'8% rispetto all'anno scorso. La prossima bolletta arriva indicativamente tra 2 settimane." }
+      ]
+    },
+    {
+      "id": "spese-02",
+      "title": "Bolletta del gas",
+      "turns": [
+        { "role": "user", "text": "Quanto ho speso di gas questo mese?" },
+        { "role": "agent", "tool": "query_expenses", "toolParams": {"categoria": "gas", "periodo": "corrente"}, "text": "Questo mese hai speso €124 di gas.\n\nNel 2026 siamo a €891 totali, in calo del 3% rispetto all'anno scorso. Ottimo risultato!" }
+      ]
+    },
+    {
+      "id": "spese-03",
+      "title": "Registra pagamento bolletta",
+      "turns": [
+        { "role": "user", "text": "Ho pagato 180€ di luce" },
+        { "role": "agent", "tool": "record_expense", "toolParams": {"importo": 180, "categoria": "luce"}, "text": "Registrato! €180 di luce aggiunti alle spese di aprile.\n\nTotale luce questo mese: €267. Rispetto ad aprile 2025 sei al +12%." }
+      ]
+    },
+    {
+      "id": "spese-04",
+      "title": "Confronto anno precedente",
+      "turns": [
+        { "role": "user", "text": "Come siamo messi rispetto all'anno scorso?" },
+        { "role": "agent", "tool": "query_expenses", "toolParams": {"periodo": "confronto_annuale"}, "text": "Confronto con 2025 (stesso periodo):\n\n⚡ Luce: +8% (€542 vs €501)\n🔥 Gas: -3% (€891 vs €920)\n💧 Acqua: pari (€187)\n\nIl gas è migliorato grazie al nuovo contratto. La luce è salita per via dei prezzi ARERA." }
+      ]
+    },
+    {
+      "id": "spese-05",
+      "title": "Riepilogo spese totali",
+      "turns": [
+        { "role": "user", "text": "Quanto ho speso in totale di utenze quest'anno?" },
+        { "role": "agent", "tool": "query_expenses", "toolParams": {"categoria": "tutte", "periodo": "ytd"}, "text": "Totale utenze 2026 (gennaio–aprile):\n\n⚡ Luce: €542\n🔥 Gas: €891\n💧 Acqua: €187\n\n**Totale: €1.620** — media mensile €405." }
+      ]
+    },
+    {
+      "id": "spese-06",
+      "title": "Registra bolletta acqua",
+      "turns": [
+        { "role": "user", "text": "ho pagato la bolletta dell'acqua, 45 euro" },
+        { "role": "agent", "tool": "record_expense", "toolParams": {"importo": 45, "categoria": "acqua"}, "text": "Registrato! €45 di acqua aggiunti ad aprile.\n\nLa tua bolletta idrica è stabile — molto in linea con la media nazionale." }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "scenario": "Televisione e promemoria programmati",
+  "description": "Dialoghi per controllare la TV e impostare promemoria/timer per azioni future",
+  "intents": ["tv_control", "set_reminder", "schedule_action"],
+  "conversations": [
+    {
+      "id": "tv-01",
+      "title": "Accendi la TV",
+      "turns": [
+        { "role": "user", "text": "Accendi la TV" },
+        { "role": "agent", "tool": "control_device", "toolParams": {"device": "TV soggiorno", "action": "accendi"}, "text": "TV del soggiorno accesa. Buona visione! 📺" }
+      ]
+    },
+    {
+      "id": "tv-02",
+      "title": "Spegni TV dopo mezzanotte",
+      "notes": "Utente scrive 'mezzaznotnta' (typo di 'mezzanotte')",
+      "turns": [
+        { "role": "user", "text": "speli la tv dopo mezzaznotnta" },
+        { "role": "agent", "tool": "set_reminder", "toolParams": {"action": "spegni_tv", "orario": "00:00"}, "text": "Ho programmato lo spegnimento della TV a mezzanotte. Ti avviso 5 minuti prima. 🕛" }
+      ]
+    },
+    {
+      "id": "tv-03",
+      "title": "Spegni TV adesso",
+      "turns": [
+        { "role": "user", "text": "Spegni la TV" },
+        { "role": "agent", "tool": "control_device", "toolParams": {"device": "TV soggiorno", "action": "spegni"}, "text": "TV spenta." }
+      ]
+    },
+    {
+      "id": "tv-04",
+      "title": "Spegni TV a orario specifico",
+      "turns": [
+        { "role": "user", "text": "Spegni la TV alle 23:30" },
+        { "role": "agent", "tool": "set_reminder", "toolParams": {"action": "spegni_tv", "orario": "23:30"}, "text": "Perfetto — la TV si spegnerà automaticamente alle 23:30. Ti avviso prima." }
+      ]
+    },
+    {
+      "id": "promemoria-01",
+      "title": "Promemoria generico",
+      "turns": [
+        { "role": "user", "text": "Ricordami di chiamare l'idraulico venerdì" },
+        { "role": "agent", "tool": "set_reminder", "toolParams": {"testo": "Chiamare l'idraulico", "giorno": "venerdì"}, "text": "Promemoria impostato per venerdì: \"Chiamare l'idraulico\". Ti notifico venerdì mattina." }
+      ]
+    },
+    {
+      "id": "promemoria-02",
+      "title": "Promemoria con orario",
+      "turns": [
+        { "role": "user", "text": "Avvisami alle 8 di mattina che devo prendere il pane" },
+        { "role": "agent", "tool": "set_reminder", "toolParams": {"testo": "Prendere il pane", "orario": "08:00"}, "text": "Promemoria impostato per le 08:00: \"Prendere il pane\". ✓" }
+      ]
+    },
+    {
+      "id": "promemoria-03",
+      "title": "Avvisami riscaldamento mezzanotte",
+      "turns": [
+        { "role": "user", "text": "Avvisami di spegnere il riscaldamento prima di andare a letto" },
+        { "role": "agent", "tool": "set_reminder", "toolParams": {"testo": "Spegni riscaldamento", "orario": "23:00"}, "text": "Promemoria impostato per le 23:00: \"Spegni il riscaldamento\". Così non dimentichi! 🌙" }
+      ]
+    }
+  ]
+}

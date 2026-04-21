@@ -1,0 +1,58 @@
+{
+  "scenario": "Controllo luci",
+  "description": "Dialoghi per accendere e spegnere le luci nelle varie stanze",
+  "intents": ["lights_on", "lights_off", "lights_status"],
+  "conversations": [
+    {
+      "id": "luci-01",
+      "title": "Accendi luci soggiorno",
+      "turns": [
+        { "role": "user", "text": "Accendi le luci del soggiorno" },
+        { "role": "agent", "tool": "control_device", "toolParams": {"device": "Luci soggiorno", "action": "accendi"}, "text": "Luci del soggiorno accese. Sono le 21:34." }
+      ]
+    },
+    {
+      "id": "luci-02",
+      "title": "Accendi luci con typo",
+      "notes": "L'utente scrive 'socciogno' invece di 'soggiorno'",
+      "turns": [
+        { "role": "user", "text": "accende le luci del socciogno" },
+        { "role": "agent", "tool": "control_device", "toolParams": {"device": "Luci soggiorno", "action": "accendi"}, "text": "Luci del soggiorno accese. Sono le 20:15." }
+      ]
+    },
+    {
+      "id": "luci-03",
+      "title": "Spegni tutte le luci",
+      "turns": [
+        { "role": "user", "text": "Spegni tutte le luci di casa" },
+        { "role": "agent", "tool": "control_device", "toolParams": {"device": "Tutte le luci", "action": "spegni"}, "text": "Tutte le luci spente. Buonanotte! 🌙" }
+      ]
+    },
+    {
+      "id": "luci-04",
+      "title": "Luci in più stanze",
+      "turns": [
+        { "role": "user", "text": "Accendi le luci in cucina" },
+        { "role": "agent", "tool": "control_device", "toolParams": {"device": "Luci cucina", "action": "accendi"}, "text": "Luci della cucina accese." },
+        { "role": "user", "text": "E anche in bagno" },
+        { "role": "agent", "tool": "control_device", "toolParams": {"device": "Luci bagno", "action": "accendi"}, "text": "Luci del bagno accese." }
+      ]
+    },
+    {
+      "id": "luci-05",
+      "title": "Quante luci sono accese?",
+      "turns": [
+        { "role": "user", "text": "Quante luci ho accese adesso?" },
+        { "role": "agent", "tool": "query_device", "toolParams": {"device": "luci", "query": "stato"}, "text": "Hai 2 luci accese: cucina e studio. Soggiorno, camera, bagno e corridoio sono spente." }
+      ]
+    },
+    {
+      "id": "luci-06",
+      "title": "Spegni luci camera da letto",
+      "turns": [
+        { "role": "user", "text": "Spegni la luce della camera da letto, vado a dormire" },
+        { "role": "agent", "tool": "control_device", "toolParams": {"device": "Luci camera", "action": "spegni"}, "text": "Luci della camera spente. Buona notte! 🌙" }
+      ]
+    }
+  ]
+}

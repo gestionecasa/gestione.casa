@@ -1,0 +1,63 @@
+{
+  "scenario": "Stato casa e clima",
+  "description": "Dialoghi per il riepilogo generale della casa, temperatura e riscaldamento",
+  "intents": ["home_status", "temperature_query", "heating_control"],
+  "conversations": [
+    {
+      "id": "stato-01",
+      "title": "Com'è messa casa",
+      "turns": [
+        { "role": "user", "text": "Com'è messa casa?" },
+        { "role": "agent", "tool": "home_status", "toolParams": {"dettaglio": "completo"}, "text": "Casa in ordine — ecco il riepilogo:\n\n💡 Luci: 2 accese (cucina, studio)\n🌡️ Temperatura: 21.5°C dentro · 16.2°C fuori\n💶 Spese mese: luce €87 · gas €124\n⏰ Prossima scadenza: Filtro acqua frigo tra 10 giorni" }
+      ]
+    },
+    {
+      "id": "stato-02",
+      "title": "Panoramica mattino",
+      "turns": [
+        { "role": "user", "text": "Buongiorno, tutto ok in casa?" },
+        { "role": "agent", "tool": "home_status", "toolParams": {"dettaglio": "mattino"}, "text": "Buongiorno! Tutto nella norma:\n\n✅ Nessun dispositivo rimasto acceso stanotte\n🌡️ 20.8°C in casa — fuori sono 12°C\n🔔 Promemoria oggi: nessuno\n⚡ Consumi ieri: nella media" }
+      ]
+    },
+    {
+      "id": "clima-01",
+      "title": "Temperatura attuale",
+      "turns": [
+        { "role": "user", "text": "Che temperatura fa in casa?" },
+        { "role": "agent", "tool": "query_sensors", "toolParams": {"sensore": "temperatura"}, "text": "In casa ci sono 21.5°C. Fuori sono 16.2°C.\n\nIl riscaldamento è attivo (target 21°C)." }
+      ]
+    },
+    {
+      "id": "clima-02",
+      "title": "Accendi riscaldamento",
+      "turns": [
+        { "role": "user", "text": "Accendi il riscaldamento" },
+        { "role": "agent", "tool": "control_device", "toolParams": {"device": "Riscaldamento", "action": "accendi", "temperatura": "21°C"}, "text": "Riscaldamento acceso, temperatura target a 21°C. Ora in casa ci sono 18°C — ci vorranno circa 20 minuti." }
+      ]
+    },
+    {
+      "id": "clima-03",
+      "title": "Accendi riscaldamento con temperatura",
+      "turns": [
+        { "role": "user", "text": "Alzami il riscaldamento a 23 gradi" },
+        { "role": "agent", "tool": "control_device", "toolParams": {"device": "Riscaldamento", "action": "imposta", "temperatura": "23°C"}, "text": "Temperatura target portata a 23°C. Il riscaldamento si sta attivando — ci vorranno circa 25 minuti per raggiungere la temperatura." }
+      ]
+    },
+    {
+      "id": "clima-04",
+      "title": "Spegni riscaldamento",
+      "turns": [
+        { "role": "user", "text": "Spegni il riscaldamento, fa troppo caldo" },
+        { "role": "agent", "tool": "control_device", "toolParams": {"device": "Riscaldamento", "action": "spegni"}, "text": "Riscaldamento spento. Temperatura attuale in casa: 21.5°C." }
+      ]
+    },
+    {
+      "id": "stato-03",
+      "title": "Riepilogo serale",
+      "turns": [
+        { "role": "user", "text": "Prima di andare a letto, tutto spento?" },
+        { "role": "agent", "tool": "home_status", "toolParams": {"dettaglio": "serale_check"}, "text": "Check serale:\n\n⚠️ Luci cucina ancora accese\n✅ TV spenta\n✅ Lavatrice ferma\n✅ Lavastoviglie ferma\n🔥 Riscaldamento: attivo (puoi abbassarlo a 18°C per la notte)\n\nVuoi che spenga le luci della cucina?" }
+      ]
+    }
+  ]
+}

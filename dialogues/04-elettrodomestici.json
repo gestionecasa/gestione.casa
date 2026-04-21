@@ -1,0 +1,63 @@
+{
+  "scenario": "Elettrodomestici",
+  "description": "Dialoghi per controllare lavatrice, lavastoviglie, forno e altri elettrodomestici",
+  "intents": ["appliance_control", "appliance_status", "appliance_notify"],
+  "conversations": [
+    {
+      "id": "elett-01",
+      "title": "Avvia lavatrice",
+      "turns": [
+        { "role": "user", "text": "Avvia la lavatrice" },
+        { "role": "agent", "tool": "control_device", "toolParams": {"device": "Lavatrice", "action": "avvia", "programma": "Cotone 40°"}, "text": "Lavatrice avviata con programma Cotone 40°. Fine ciclo prevista alle 22:41. Ti avviso quando ha finito." }
+      ]
+    },
+    {
+      "id": "elett-02",
+      "title": "Avvisami quando finisce la lavatrice",
+      "turns": [
+        { "role": "user", "text": "avvisami quando la lavatrice ha finito" },
+        { "role": "agent", "tool": "set_reminder", "toolParams": {"trigger": "lavatrice_fine", "channel": "notifica"}, "text": "Perfetto, ti avviso quando la lavatrice ha finito il ciclo. Stima fine: 22:41." }
+      ]
+    },
+    {
+      "id": "elett-03",
+      "title": "Stato lavatrice",
+      "turns": [
+        { "role": "user", "text": "Quanto manca per la lavatrice?" },
+        { "role": "agent", "tool": "query_device", "toolParams": {"device": "Lavatrice"}, "text": "La lavatrice è in funzione con programma Cotone 40°. Mancano circa 47 minuti (fine prevista alle 22:41)." }
+      ]
+    },
+    {
+      "id": "elett-04",
+      "title": "Spegni lavastoviglie",
+      "turns": [
+        { "role": "user", "text": "spegni la lavastogilie" },
+        { "role": "agent", "tool": "control_device", "toolParams": {"device": "Lavastoviglie", "action": "spegni"}, "text": "Lavastoviglie spenta." }
+      ]
+    },
+    {
+      "id": "elett-05",
+      "title": "Avvia lavastoviglie",
+      "turns": [
+        { "role": "user", "text": "Accendi la lavastoviglie" },
+        { "role": "agent", "tool": "control_device", "toolParams": {"device": "Lavastoviglie", "action": "avvia", "programma": "Eco 50°"}, "text": "Lavastoviglie avviata con programma Eco 50°. Fine ciclo prevista alle 23:05." }
+      ]
+    },
+    {
+      "id": "elett-06",
+      "title": "Flusso completo lavatrice + notifica",
+      "turns": [
+        { "role": "user", "text": "Metti su la lavatrice e avvisami quando finisce" },
+        { "role": "agent", "tool": "control_device", "toolParams": {"device": "Lavatrice", "action": "avvia"}, "text": "Lavatrice avviata! Fine ciclo alle 22:41. Ho impostato anche la notifica di fine ciclo — ti avviso." }
+      ]
+    },
+    {
+      "id": "elett-07",
+      "title": "Stato generale elettrodomestici",
+      "turns": [
+        { "role": "user", "text": "Cosa ho acceso adesso?" },
+        { "role": "agent", "tool": "home_status", "toolParams": {"filtro": "elettrodomestici"}, "text": "Elettrodomestici attivi:\n\n🔄 Lavatrice — Cotone 40°, mancano 47 min\n✅ Riscaldamento — 21°C\n\nLavastoviglie, forno e altri sono spenti." }
+      ]
+    }
+  ]
+}

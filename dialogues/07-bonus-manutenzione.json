@@ -1,0 +1,47 @@
+{
+  "scenario": "Bonus edilizi e manutenzione",
+  "description": "Dialoghi su agevolazioni fiscali, bonus casa, e interventi di manutenzione",
+  "intents": ["query_bonus", "query_deadlines", "set_reminder"],
+  "conversations": [
+    {
+      "id": "bonus-01",
+      "title": "Bonus cappotto termico",
+      "turns": [
+        { "role": "user", "text": "C'è qualche bonus per il cappotto termico?" },
+        { "role": "agent", "tool": "query_bonus", "toolParams": {"tipo": "isolamento"}, "text": "Ecobonus 65% — ancora attivo per il cappotto termico e l'isolamento dell'involucro edilizio.\n\nValido per edifici esistenti, detraibile in 10 anni. Massimale €100.000.\n\nFonte: ENEA, aggiornato aprile 2026." }
+      ]
+    },
+    {
+      "id": "bonus-02",
+      "title": "Bonus finestre",
+      "turns": [
+        { "role": "user", "text": "Bonus per cambiare le finestre?" },
+        { "role": "agent", "tool": "query_bonus", "toolParams": {"tipo": "infissi"}, "text": "Ecobonus 50% per la sostituzione di finestre e infissi con modelli a bassa trasmittanza.\n\nMassimale €60.000, detraibile in 10 anni.\n\nFonte: ENEA / Agenzia delle Entrate, aprile 2026." }
+      ]
+    },
+    {
+      "id": "bonus-03",
+      "title": "Bonus caldaia",
+      "turns": [
+        { "role": "user", "text": "Se cambio la caldaia ho un bonus?" },
+        { "role": "agent", "tool": "query_bonus", "toolParams": {"tipo": "caldaia"}, "text": "Bonus Caldaia 50% per la sostituzione con caldaia a condensazione classe A o superiore.\n\nMassimale €30.000, detraibile in 10 anni. Deve essere eseguita da un tecnico abilitato con relazione.\n\nFonte: ENEA, aprile 2026." }
+      ]
+    },
+    {
+      "id": "manutenzione-01",
+      "title": "Revisione caldaia programmata",
+      "turns": [
+        { "role": "user", "text": "Devo chiamare qualcuno per la revisione della caldaia?" },
+        { "role": "agent", "tool": "query_deadlines", "toolParams": {"tipo": "revisione_caldaia"}, "text": "La revisione è programmata per il 1° giugno, tra 41 giorni. È obbligatoria per legge ogni 2 anni.\n\nVuoi che imposti un promemoria per chiamare il tecnico la settimana prima?" }
+      ]
+    },
+    {
+      "id": "manutenzione-02",
+      "title": "Filtro acqua urgente",
+      "turns": [
+        { "role": "user", "text": "Ho qualcosa di urgente da fare in casa?" },
+        { "role": "agent", "tool": "query_deadlines", "toolParams": {"urgenza": "alta"}, "text": "Sì — il filtro acqua del frigo scade tra 10 giorni (1° maggio). È il più urgente.\n\nDopo ci sono il contratto gas (15 maggio) e la revisione caldaia (1° giugno).\n\nVuoi che ordini il filtro o imposti un promemoria?" }
+      ]
+    }
+  ]
+}

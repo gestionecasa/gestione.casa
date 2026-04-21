@@ -1,0 +1,58 @@
+{
+  "scenario": "Conversazioni multi-turno",
+  "description": "Sessioni complesse con più scambi, cambio di contesto e follow-up",
+  "intents": ["multi_intent", "context_aware", "follow_up"],
+  "conversations": [
+    {
+      "id": "multi-01",
+      "title": "Sessione serale completa",
+      "notes": "Utente gestisce tutta la serata in una conversazione",
+      "turns": [
+        { "role": "user", "text": "Buonasera! Com'è messa casa?" },
+        { "role": "agent", "text": "Buonasera! Casa va bene — 2 luci accese (cucina, studio), 21.5°C dentro, nessun elettrodomestico in funzione. Cosa vuoi fare?" },
+        { "role": "user", "text": "Accendi le luci del soggiorno e la TV" },
+        { "role": "agent", "tool": "control_device", "text": "Luci del soggiorno accese e TV accesa. Buona serata! 📺" },
+        { "role": "user", "text": "Spegni la TV dopo mezzanotte" },
+        { "role": "agent", "tool": "set_reminder", "text": "Fatto — TV programmata per spegnersi a mezzanotte. Ti avviso 5 minuti prima." },
+        { "role": "user", "text": "E avvia la lavatrice" },
+        { "role": "agent", "tool": "control_device", "text": "Lavatrice avviata con programma Cotone 40°. Fine ciclo alle 23:17 — ti avviso quando ha finito." }
+      ]
+    },
+    {
+      "id": "multi-02",
+      "title": "Gestione bollette con registrazione",
+      "turns": [
+        { "role": "user", "text": "Quanto stiamo pagando di utenze?" },
+        { "role": "agent", "tool": "query_expenses", "text": "Questo mese:\n• Luce: €87\n• Gas: €124\n• Acqua: €23\n\nTotale: €234." },
+        { "role": "user", "text": "Ho pagato la bolletta della luce ieri, 95 euro" },
+        { "role": "agent", "tool": "record_expense", "text": "Registrato! €95 di luce per aprile. Totale luce 2026: €637." },
+        { "role": "user", "text": "E quando scade il contratto gas?" },
+        { "role": "agent", "tool": "query_deadlines", "text": "Il contratto gas scade il 15 maggio — tra 24 giorni. Vuoi un promemoria?" }
+      ]
+    },
+    {
+      "id": "multi-03",
+      "title": "Routine mattutina",
+      "turns": [
+        { "role": "user", "text": "Buongiorno casa" },
+        { "role": "agent", "text": "Buongiorno! Stanotte è andato tutto bene — 19.2°C in casa. Fuori ci sono 11°C, mettiti qualcosa di caldo!" },
+        { "role": "user", "text": "Accendi il riscaldamento" },
+        { "role": "agent", "tool": "control_device", "text": "Riscaldamento acceso, target 21°C. Ci vorranno circa 20 minuti." },
+        { "role": "user", "text": "Ricordami di controllare il filtro del frigo" },
+        { "role": "agent", "tool": "set_reminder", "text": "Promemoria impostato: \"Controllare filtro frigo\". Ti notifico oggi!" },
+        { "role": "user", "text": "Grazie, a dopo" },
+        { "role": "agent", "text": "Prego! Il riscaldamento sarà caldo quando torni. A dopo!" }
+      ]
+    },
+    {
+      "id": "multi-04",
+      "title": "Risparmio energetico",
+      "turns": [
+        { "role": "user", "text": "Come posso risparmiare sulla bolletta della luce?" },
+        { "role": "agent", "text": "Alcune idee basate sui tuoi dati:\n\n1. Le luci di studio e cucina restano spesso accese tardi — le spegni prima?\n2. La lavatrice consuma meno di notte (tariffa F0/F1)\n3. Il riscaldamento a 20°C invece di 22°C può fare -15% sul gas\n\nVuoi che imposti qualche automazione?" },
+        { "role": "user", "text": "Sì, spegni automaticamente le luci dello studio a mezzanotte" },
+        { "role": "agent", "tool": "set_reminder", "text": "Automazione impostata: luci studio si spengono ogni notte a mezzanotte. ✓" }
+      ]
+    }
+  ]
+}

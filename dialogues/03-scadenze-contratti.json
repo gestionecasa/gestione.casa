@@ -1,0 +1,49 @@
+{
+  "scenario": "Scadenze e contratti",
+  "description": "Dialoghi per verificare scadenze di contratti, revisioni e manutenzioni",
+  "intents": ["query_deadlines", "set_reminder"],
+  "conversations": [
+    {
+      "id": "scad-01",
+      "title": "Quando scade il gas",
+      "turns": [
+        { "role": "user", "text": "Quando scade il gas?" },
+        { "role": "agent", "tool": "query_deadlines", "toolParams": {"tipo": "contratto_gas"}, "text": "Il contratto gas con ENI Gas e Luce scade il 15 maggio 2026, tra 24 giorni.\n\nVuoi che ti imposti un promemoria per confrontare le offerte prima?" }
+      ]
+    },
+    {
+      "id": "scad-02",
+      "title": "Rinnovo contratto gas — seguito",
+      "turns": [
+        { "role": "user", "text": "Quando scade il contratto gas?" },
+        { "role": "agent", "tool": "query_deadlines", "toolParams": {"tipo": "contratto_gas"}, "text": "Scade il 15 maggio, tra 24 giorni. Vuoi che ti ricordi di confrontare le offerte?" },
+        { "role": "user", "text": "Sì, ricordamelo 2 settimane prima" },
+        { "role": "agent", "tool": "set_reminder", "toolParams": {"evento": "Confronta offerte gas", "data": "2026-05-01"}, "text": "Promemoria impostato per il 1° maggio: \"Confronta offerte gas prima della scadenza il 15 maggio\"." }
+      ]
+    },
+    {
+      "id": "scad-03",
+      "title": "Revisione caldaia",
+      "turns": [
+        { "role": "user", "text": "Quando è la revisione della caldaia?" },
+        { "role": "agent", "tool": "query_deadlines", "toolParams": {"tipo": "revisione_caldaia"}, "text": "La prossima revisione della caldaia è fissata per il 1° giugno 2026, tra 41 giorni.\n\nSei già in regola per quest'anno." }
+      ]
+    },
+    {
+      "id": "scad-04",
+      "title": "Tutte le scadenze",
+      "turns": [
+        { "role": "user", "text": "Dimmi tutte le scadenze imminenti" },
+        { "role": "agent", "tool": "query_deadlines", "toolParams": {"tipo": "tutte", "limite": 4}, "text": "Prossime scadenze:\n\n🔴 Filtro acqua frigo — tra 10 giorni (1 maggio)\n🟡 Contratto gas ENI — tra 24 giorni (15 maggio)\n🟡 Revisione caldaia — tra 41 giorni (1 giugno)\n🟢 Assicurazione casa — tra 162 giorni (30 settembre)\n\nLa più urgente è il filtro acqua del frigo!" }
+      ]
+    },
+    {
+      "id": "scad-05",
+      "title": "Filtro acqua frigo",
+      "turns": [
+        { "role": "user", "text": "Quando devo cambiare il filtro dell'acqua del frigo?" },
+        { "role": "agent", "tool": "query_deadlines", "toolParams": {"tipo": "filtro_acqua"}, "text": "Il filtro acqua del frigo scade tra 10 giorni, il 1° maggio 2026.\n\nHa già 6 mesi — è il momento di ordinarlo. Vuoi che ti mandi un promemoria 2 giorni prima?" }
+      ]
+    }
+  ]
+}
