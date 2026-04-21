@@ -435,9 +435,9 @@ const App = (() => {
           allBtns.forEach(b => { b.disabled = true; });
           btn.textContent = 'Connessione…';
           btn.classList.add('is-loading');
-          const result = await connectBroker(broker);
+          const connectResult = await connectBroker(broker);
           btn.classList.remove('is-loading');
-          if (result.ok) {
+          if (connectResult.ok) {
             btn.textContent = 'Connesso';
             btn.classList.add('is-connected');
           } else {
@@ -739,6 +739,9 @@ const App = (() => {
           <span class="sidebar-auth-dot"></span>
           <span class="sidebar-auth-label">OpenRouter connesso</span>
         </div>
+        <div class="sidebar-auth-credits" id="sidebarAuthCredits">
+          <div class="sidebar-auth-credits-loading">Caricamento crediti…</div>
+        </div>
         <button class="sidebar-auth-logout" id="sidebarLogoutBtn">Esci</button>`;
       $('sidebarLogoutBtn').addEventListener('click', () => {
         OpenRouterAuth.logout();
@@ -748,6 +751,7 @@ const App = (() => {
         agentTagline.textContent = 'Pronto — cosa vuoi fare?';
       }, { once: true });
       agentTagline.textContent = 'Connesso a OpenRouter';
+      loadOpenRouterKeyStats();
     } else {
       authEl.innerHTML = `
         <button class="sidebar-auth-btn" id="sidebarLoginBtn">
@@ -762,6 +766,69 @@ const App = (() => {
         OpenRouterAuth.startOAuth();
       }, { once: true });
     }
+  }
+
+  async function loadOpenRouterKeyStats() {
+    const creditsEl = $('sidebarAuthCredits');
+    const token = OpenRouterAuth.getToken();
+    if (!creditsEl || !token) return;
+
+    console.groupCollapsed('[OpenRouter] caricamento crediti key');
+    try {
+      const res = await fetch('https://openrouter.ai/api/v1/key', {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
+      });
+      const data = await res.json().catch(() => ({}));
+      console.log('status:', res.status, res.statusText);
+      console.log('payload:', data);
+      if (!res.ok) throw new Error(data?.error?.message || `OpenRouter key info HTTP ${res.status}`);
+
+      const key = data.data || {};
+      creditsEl.innerHTML = buildOpenRouterCredits(key);
+    } catch (err) {
+      console.warn('[OpenRouter] crediti non disponibili:', err);
+      creditsEl.innerHTML = `
+        <div class="sidebar-auth-credits-error" title="${esc(err.message)}">
+          Crediti non disponibili
+        </div>`;
+    } finally {
+      console.groupEnd();
+    }
+  }
+
+  function buildOpenRouterCredits(key) {
+    const remaining = key.limit_remaining;
+    const limit = key.limit;
+    const usage = key.usage ?? 0;
+    const monthly = key.usage_monthly ?? 0;
+    const daily = key.usage_daily ?? 0;
+    const remainingText = remaining == null ? 'Illimitati' : formatCredits(remaining);
+    const limitText = limit == null ? 'Nessun limite' : formatCredits(limit);
+
+    return `
+      <div class="sidebar-auth-credit-grid">
+        <div class="sidebar-auth-credit-card">
+          <span class="sidebar-auth-credit-label">Rimasti</span>
+          <strong>${esc(remainingText)}</strong>
+          <span>${esc(limitText)}</span>
+        </div>
+        <div class="sidebar-auth-credit-card">
+          <span class="sidebar-auth-credit-label">Usati</span>
+          <strong>${esc(formatCredits(usage))}</strong>
+          <span>mese ${esc(formatCredits(monthly))}</span>
+        </div>
+      </div>
+      <div class="sidebar-auth-credit-foot">Oggi ${esc(formatCredits(daily))}</div>`;
+  }
+
+  function formatCredits(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '—';
+    return n.toLocaleString('it-IT', {
+      minimumFractionDigits: n < 1 && n > 0 ? 4 : 2,
+      maximumFractionDigits: n < 1 && n > 0 ? 4 : 2,
+    });
   }
 
   return { init, renderAuthWidget, showDiscoveryBar };
