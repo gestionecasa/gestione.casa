@@ -8,71 +8,61 @@
     });
   }
 
-  // ── Already installed as standalone → never show banner ──
+  // ── Already installed as standalone → mai mostrare ──
   const isStandalone =
     window.matchMedia('(display-mode: standalone)').matches ||
     window.navigator.standalone === true;
 
   if (isStandalone) return;
 
-  // ── Only on mobile ─────────────────────────
-  const isMobile = () => window.innerWidth <= 768;
+  // ── Solo mobile ────────────────────────────
+  if (window.innerWidth > 768) return;
 
-  // ── Detect iOS (no beforeinstallprompt) ────
+  // ── Controllo dismiss (24h) ────────────────
+  const DISMISS_KEY = 'pwa-banner-dismissed-at';
+  const dismissedAt = localStorage.getItem(DISMISS_KEY);
+  if (dismissedAt && Date.now() - Number(dismissedAt) < 24 * 60 * 60 * 1000) return;
+
+  // ── Elementi ───────────────────────────────
+  const banner     = document.getElementById('pwaBanner');
+  const installBtn = document.getElementById('pwaInstallBtn');
+  const dismissBtn = document.getElementById('pwaDismissBtn');
+  const bannerSub  = document.getElementById('pwaBannerSub');
+
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-
-  const banner      = document.getElementById('pwaBanner');
-  const installBtn  = document.getElementById('pwaInstallBtn');
-  const dismissBtn  = document.getElementById('pwaDismissBtn');
-  const bannerSub   = document.getElementById('pwaBannerSub');
-  const DISMISS_KEY = 'pwa-banner-dismissed';
-
   let deferredPrompt = null;
 
-  function showBanner() {
-    if (localStorage.getItem(DISMISS_KEY)) return;
-    if (!isMobile()) return;
-    banner.classList.add('visible');
-  }
+  // ── Mostra subito ──────────────────────────
+  banner.classList.add('visible');
 
-  function hideBanner() {
-    banner.classList.remove('visible');
-  }
-
-  // ── Android / Chrome: capture install prompt ─
+  // ── Cattura prompt Android (se disponibile) ─
   window.addEventListener('beforeinstallprompt', e => {
     e.preventDefault();
     deferredPrompt = e;
-    // Small delay so the UI settles first
-    setTimeout(showBanner, 2500);
   });
 
+  // ── Installa ───────────────────────────────
   installBtn.addEventListener('click', async () => {
     if (isIOS) {
-      // Can't trigger programmatically on iOS — user already knows what to do
-      hideBanner();
+      bannerSub.textContent = '1. Tocca  ↑  in Safari  2. Scorri e tocca "Aggiungi alla schermata Home"';
       return;
     }
     if (!deferredPrompt) return;
     deferredPrompt.prompt();
     await deferredPrompt.userChoice;
     deferredPrompt = null;
-    hideBanner();
+    banner.classList.remove('visible');
   });
 
+  // ── Chiudi → ricompare dopo 24h ────────────
   dismissBtn.addEventListener('click', () => {
-    localStorage.setItem(DISMISS_KEY, '1');
-    hideBanner();
+    localStorage.setItem(DISMISS_KEY, String(Date.now()));
+    banner.classList.remove('visible');
   });
 
-  // ── iOS: show banner with manual instructions ─
+  // ── iOS: testo adattato ────────────────────
   if (isIOS) {
-    bannerSub.textContent = 'Tocca  ↑  poi "Aggiungi a Home" per accesso rapido.';
+    bannerSub.textContent = 'Tocca  ↑  poi "Aggiungi alla schermata Home" in Safari.';
     installBtn.textContent = 'Come si fa?';
-    installBtn.addEventListener('click', () => {
-      // Replace sub with step-by-step, briefly
-      bannerSub.textContent = '1. Tocca il tasto Condividi (↑) in Safari  2. Scorri e tocca "Aggiungi alla schermata Home"';
-    }, { once: true });
-    setTimeout(showBanner, 2500);
   }
 })();
