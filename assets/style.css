@@ -1018,6 +1018,7 @@ body {
 }
 
 /* ── BROKER DISCOVERY BAR ──────────────────── */
+.discovery-bar[hidden] { display: none; }
 .discovery-bar {
   display: flex;
   align-items: center;
