@@ -33,6 +33,7 @@ const App = (() => {
     renderSidebar();
     bindEvents();
     initMic();
+    input.closest('.input-bar').classList.add('empty');
   }
 
   // ── SIDEBAR ───────────────────────────────
@@ -123,13 +124,11 @@ const App = (() => {
       { icon: '💶', text: 'quanto paghiamo di luce?' },
       { icon: '🔄', text: 'avvisami quando finisce la lavatrice' },
       { icon: '📅', text: 'quando scade il contratto gas?' },
-      { icon: '🌡️', text: 'che temperatura fa in casa?' },
     ];
     messagesEl.innerHTML = `
       <div class="welcome-msg">
         <img src="assets/images/logo.png" alt="Casa" class="welcome-logo">
-        <div class="welcome-hey">Hey</div>
-        <div class="welcome-casa">Casa.</div>
+        <div class="welcome-headline"><span class="welcome-hey">Hey</span> <span class="welcome-casa">Casa.</span></div>
         <div class="welcome-sub">Il tuo agente domestico. Controlla dispositivi, tieni traccia delle spese, gestisce le scadenze — tutto privato, tutto tuo.</div>
         <div class="welcome-examples">
           ${examples.map(e => `
@@ -154,7 +153,12 @@ const App = (() => {
     const el = document.createElement('div');
     el.className = 'msg user';
     el.innerHTML = `
-      <div class="msg-avatar user-av">F</div>
+      <div class="msg-avatar user-av">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="7" r="4" fill="white"/>
+          <path d="M20 21a8 8 0 0 0-16 0z" fill="white"/>
+        </svg>
+      </div>
       <div class="msg-body">
         <div class="msg-bubble">${esc(text)}</div>
         <div class="msg-time">${nowStr()}</div>
@@ -168,7 +172,7 @@ const App = (() => {
     el.className = 'typing-indicator';
     el.id = 'typingEl';
     el.innerHTML = `
-      <div class="msg-avatar agent-av">⌂</div>
+      <div class="msg-avatar agent-av"></div>
       <div class="typing-bubble">
         <div class="typing-dot"></div>
         <div class="typing-dot"></div>
@@ -184,7 +188,7 @@ const App = (() => {
     el.className = 'msg agent';
     el.id = 'toolExecEl';
     el.innerHTML = `
-      <div class="msg-avatar agent-av">⌂</div>
+      <div class="msg-avatar agent-av"></div>
       <div class="msg-body">
         <div class="tool-executing">
           <div class="tool-executing-spinner"></div>
@@ -205,7 +209,7 @@ const App = (() => {
     const el = document.createElement('div');
     el.className = 'msg agent';
     el.innerHTML = `
-      <div class="msg-avatar agent-av">⌂</div>
+      <div class="msg-avatar agent-av"></div>
       <div class="msg-body">
         ${toolCard}
         <div class="msg-bubble">${fmt(result.message)}</div>
@@ -238,6 +242,7 @@ const App = (() => {
     isBusy = true;
     input.value = '';
     input.style.height = 'auto';
+    input.closest('.input-bar').classList.add('empty');
     sendBtn.disabled = true;
     agentTagline.textContent = 'Sto elaborando…';
     $('agentAvatar').classList.add('thinking');
@@ -331,6 +336,7 @@ const App = (() => {
       sendBtn.disabled = !input.value.trim() || isBusy;
       input.style.height = 'auto';
       input.style.height = Math.min(input.scrollHeight, 160) + 'px';
+      input.closest('.input-bar').classList.toggle('empty', !input.value);
     });
 
     sendBtn.addEventListener('click', send);

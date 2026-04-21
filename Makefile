@@ -1,4 +1,10 @@
+PORT ?= 8765
 
+serve:
+	@echo ""
+	@echo "  ⌂  Hey Casa — http://localhost:$(PORT)"
+	@echo ""
+	@python3 -m http.server $(PORT) --bind 127.0.0.1
 
 push:
 	@git add .

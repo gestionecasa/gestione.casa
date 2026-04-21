@@ -1,0 +1,21 @@
+{
+  "name": "Hey Casa — Agente Domestico",
+  "short_name": "Hey Casa",
+  "description": "Il tuo agente domestico. Controlla luci, bollette e scadenze con una semplice chat.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f4f1",
+  "theme_color": "#6c63ff",
+  "orientation": "portrait-primary",
+  "lang": "it",
+  "categories": ["utilities", "lifestyle"],
+  "icons": [
+    {
+      "src": "assets/images/logo.png",
+      "sizes": "445x445",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

@@ -5,7 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hey Casa — Il tuo agente domestico</title>
   <link rel="stylesheet" href="assets/style.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⌂</text></svg>">
+  <link rel="icon" type="image/png" href="assets/images/logo.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#6c63ff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Hey Casa">
+  <link rel="apple-touch-icon" href="assets/images/logo.png">
 </head>
 <body>
 <div class="layout">
@@ -15,7 +21,7 @@
 
     <div class="sidebar-brand">
       <img src="assets/images/logo.png" alt="Casa" class="brand-logo">
-      <span class="brand-tag">demo</span>
+      <span class="brand-tag">v0.1.0</span>
     </div>
 
     <div class="sidebar-section">
@@ -101,10 +107,38 @@
       </div>
     </div>
 
+    <!-- PWA install banner — shown only on mobile when not installed -->
+    <div class="pwa-banner" id="pwaBanner" role="complementary" aria-label="Installa l'app">
+      <img src="assets/images/logo.png" alt="Hey Casa" class="pwa-banner-logo">
+      <div class="pwa-banner-body">
+        <strong>Aggiungi Hey Casa</strong>
+        <span id="pwaBannerSub">Accesso rapido dalla home, funziona anche offline.</span>
+      </div>
+      <button class="pwa-install-btn" id="pwaInstallBtn">Installa</button>
+      <button class="pwa-dismiss-btn" id="pwaDismissBtn" aria-label="Chiudi">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
   </main>
 </div>
 
+<!-- gradient definitions shared across all SVG avatars -->
+<svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+  <defs>
+    <linearGradient id="grad-rainbow" x1="0" y1="0" x2="1" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0%"   stop-color="#ff6b6b"/>
+      <stop offset="30%"  stop-color="#ffd93d"/>
+      <stop offset="65%"  stop-color="#4d96ff"/>
+      <stop offset="100%" stop-color="#c77dff"/>
+    </linearGradient>
+  </defs>
+</svg>
+
 <script src="assets/core/fake-agent.js"></script>
 <script src="assets/app.js"></script>
+<script src="assets/pwa.js"></script>
 </body>
 </html>
