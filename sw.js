@@ -1,5 +1,5 @@
 // sw.js — Service Worker per Hey Casa PWA
-const CACHE = 'casa-v8';
+const CACHE = 'casa-v10';
 const ASSETS = [
   './',
   './index.html',
@@ -8,7 +8,6 @@ const ASSETS = [
   './assets/pwa.js',
   './assets/core/fake-agent.js',
   './assets/images/logo.png',
-  './assets/images/app-logo.png',
   './assets/images/icons/icon-192x192.png',
   './assets/images/icons/icon-512x512.png',
   './manifest.json',
