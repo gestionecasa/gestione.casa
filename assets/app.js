@@ -33,7 +33,7 @@ const App = (() => {
     renderSidebar();
     bindEvents();
     initMic();
-    input.closest('.input-bar').classList.add('empty');
+    updateInputLayout();
   }
 
   // ── SIDEBAR ───────────────────────────────
@@ -241,8 +241,7 @@ const App = (() => {
 
     isBusy = true;
     input.value = '';
-    input.style.height = 'auto';
-    input.closest('.input-bar').classList.add('empty');
+    updateInputLayout();
     sendBtn.disabled = true;
     agentTagline.textContent = 'Sto elaborando…';
     $('agentAvatar').classList.add('thinking');
@@ -353,6 +352,15 @@ const App = (() => {
     requestAnimationFrame(() => { container.scrollTop = container.scrollHeight; });
   }
 
+  function updateInputLayout() {
+    input.style.height = 'auto';
+    const nextHeight = Math.min(input.scrollHeight, 160);
+    input.style.height = nextHeight + 'px';
+
+    const lineHeight = parseFloat(getComputedStyle(input).lineHeight);
+    input.closest('.input-bar').classList.toggle('multiline', nextHeight > lineHeight * 1.8);
+  }
+
   // ── EVENTS ────────────────────────────────
   function bindEvents() {
     // Enter = send, Shift+Enter = newline
@@ -362,9 +370,7 @@ const App = (() => {
 
     input.addEventListener('input', () => {
       sendBtn.disabled = !input.value.trim() || isBusy;
-      input.style.height = 'auto';
-      input.style.height = Math.min(input.scrollHeight, 160) + 'px';
-      input.closest('.input-bar').classList.toggle('empty', !input.value);
+      updateInputLayout();
     });
 
     sendBtn.addEventListener('click', send);

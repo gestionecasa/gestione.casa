@@ -608,7 +608,7 @@ body {
 
 .input-bar {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
   background: var(--bg-input);
   border: 1.5px solid var(--border);
@@ -618,8 +618,8 @@ body {
   transition: border-color .15s, box-shadow .15s;
 }
 
-.input-bar.empty {
-  align-items: center;
+.input-bar.multiline {
+  align-items: flex-start;
 }
 
 .input-bar:focus-within {
