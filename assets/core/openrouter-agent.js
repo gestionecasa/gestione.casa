@@ -2,7 +2,29 @@
 
 const OpenRouterAgent = (() => {
 
-  const MODEL = 'google/gemma-3-4b-it:free';
+  let MODEL = null; // resolved dynamically from OpenRouter models API
+
+  async function resolveModel() {
+    if (MODEL) return MODEL;
+    try {
+      const res = await fetch('https://openrouter.ai/api/v1/models', {
+        headers: { Authorization: `Bearer ${OpenRouterAuth.getToken()}` },
+      });
+      const { data } = await res.json();
+      const free = (data || [])
+        .filter(m => m.id.endsWith(':free'))
+        .sort((a, b) => (b.context_length ?? 0) - (a.context_length ?? 0));
+      if (free.length) {
+        MODEL = free[0].id;
+        console.log('[OpenRouter] modello selezionato:', MODEL);
+      } else {
+        MODEL = 'openai/gpt-4o-mini'; // fallback a pagamento se non ci sono free
+      }
+    } catch {
+      MODEL = 'openai/gpt-4o-mini';
+    }
+    return MODEL;
+  }
 
   const SYSTEM = `Sei Casa, un assistente domestico intelligente e conversazionale.
 Aiuti l'utente a gestire la casa: luci e dispositivi smart, spese e bollette, scadenze e contratti, promemoria, bonus edilizi.
@@ -24,6 +46,8 @@ Se non sai qualcosa o non hai accesso ai dati reali della casa, dillo chiarament
     history.push({ role: 'user', content: rawMsg });
     trimHistory();
 
+    const model = await resolveModel();
+
     let res, data;
     try {
       res  = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -35,7 +59,7 @@ Se non sai qualcosa o non hai accesso ai dati reali della casa, dillo chiarament
           'X-Title':       'Hey Casa',
         },
         body: JSON.stringify({
-          model:    MODEL,
+          model,
           messages: [{ role: 'system', content: SYSTEM }, ...history],
         }),
       });
@@ -47,9 +71,13 @@ Se non sai qualcosa o non hai accesso ai dati reali della casa, dillo chiarament
 
     if (!res.ok) {
       history.pop();
+      console.error('[OpenRouter] error body:', JSON.stringify(data));
       const msg = data?.error?.message || `Errore ${res.status}`;
-      if (res.status === 429) return { message: `Il modello è momentaneamente sovraccarico (429). Riprova tra qualche secondo.\n\nModello usato: \`${MODEL}\`` };
-      return { message: `Errore OpenRouter: ${msg}` };
+      if (res.status === 429 || res.status === 404) {
+        MODEL = null; // forza selezione nuovo modello al prossimo invio
+        return { message: `Modello \`${model}\` non disponibile (${res.status}). Riprova — verrà selezionato un modello alternativo.` };
+      }
+      return { message: `Errore OpenRouter (${res.status}): ${msg}` };
     }
 
     const content = data.choices?.[0]?.message?.content ?? '(nessuna risposta)';
