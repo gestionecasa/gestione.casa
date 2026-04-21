@@ -1366,3 +1366,11 @@ body {
   color: #fff;
   border-color: var(--danger);
 }
+
+/* ── BROKER CONNECT BUTTONS IN CHAT ───────── */
+.broker-connect-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}

@@ -25,6 +25,55 @@ Chiamare quando l'utente chiede "cosa puoi fare?", "quali comandi hai?",
     {
       type: 'function',
       function: {
+        name: 'start_broker_scan',
+        description: `Avvia la scansione della rete LAN per trovare broker domotici (Home Assistant, MQTT, Node-RED, ecc.).
+La scansione parte in background. Usare quando l'utente dice "cerca broker", "scansiona la rete",
+"trova dispositivi", "avvia ricerca". Se una scansione è già in corso, lo segnala senza riavviarla.`,
+        parameters: { type: 'object', properties: {}, required: [] }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'stop_broker_scan',
+        description: `Interrompe una scansione broker in corso. Usare quando l'utente dice
+"ferma", "stop", "interrompi la ricerca", "annulla scansione".
+Se non c'è nessuna scansione attiva, lo segnala.`,
+        parameters: { type: 'object', properties: {}, required: [] }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'get_broker_scan_status',
+        description: `Restituisce lo stato attuale della scansione broker: se è in corso, completata o ferma,
+la percentuale di avanzamento, e i broker già trovati. Usare quando l'utente chiede
+"com'è la ricerca?", "hai trovato qualcosa?", "a che punto sei?", "stato scansione".`,
+        parameters: { type: 'object', properties: {}, required: [] }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'get_broker_scan_logs',
+        description: `Restituisce i log dettagliati dell'ultima scansione broker: ogni IP sondato,
+ogni porta testata, ogni broker trovato. Usare quando l'utente chiede "mostra i log",
+"vedi dettagli ricerca", "cosa sta succedendo nella scansione".`,
+        parameters: {
+          type: 'object',
+          properties: {
+            last: {
+              type: 'number',
+              description: 'Numero di righe di log da restituire (default 50, max 200).'
+            }
+          },
+          required: []
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
         name: 'get_broker_status',
         description: `Verifica se il broker domotico è raggiungibile e operativo.
 Chiamare sempre come primo tool se l'utente segnala problemi di connessione
@@ -294,6 +343,50 @@ IMPORTANTE: prima di sbloccare chiedere sempre conferma esplicita all'utente.`,
       case 'control_lock': {
         const svc = input.action === 'lock' ? 'lock/lock' : 'lock/unlock';
         return ha(`services/${svc}`, 'POST', { entity_id: input.entity_id });
+      }
+
+      case 'start_broker_scan': {
+        const s = BrokerDiscovery.getStatus();
+        if (s.status === 'running') {
+          return { started: false, reason: 'Scansione già in corso', progress: s.progress, found: s.found };
+        }
+        // Avvia in background — non aspettiamo il completamento
+        BrokerDiscovery.scan().then(found => {
+          console.log('[MCP] scan completata:', found.length, 'broker');
+        });
+        return { started: true, message: 'Scansione avviata in background. Usa get_broker_scan_status per monitorare.' };
+      }
+
+      case 'stop_broker_scan': {
+        const stopped = BrokerDiscovery.abort();
+        if (!stopped) {
+          return { stopped: false, reason: 'Nessuna scansione in corso al momento.' };
+        }
+        return { stopped: true, message: 'Scansione interrotta.' };
+      }
+
+      case 'get_broker_scan_status': {
+        const s = BrokerDiscovery.getStatus();
+        return {
+          status:      s.status,
+          progress:    `${s.progress}%`,
+          found_count: s.found.length,
+          found:       s.found,
+          started_at:  s.startedAt,
+          completed_at:s.completedAt,
+        };
+      }
+
+      case 'get_broker_scan_logs': {
+        const n    = Math.min(input.last ?? 50, 200);
+        const logs = BrokerDiscovery.getLogs(n);
+        const s    = BrokerDiscovery.getStatus();
+        return {
+          status:     s.status,
+          total_lines:s.logLines,
+          showing:    logs.length,
+          logs,
+        };
       }
 
       case 'describe_tools': {

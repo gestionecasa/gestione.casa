@@ -67,19 +67,9 @@ const App = (() => {
     const logPanel   = $('discoveryLog');
     const logPre     = $('discoveryLogPre');
 
-    function ts() {
-      const d = new Date();
-      return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}:${d.getSeconds().toString().padStart(2,'0')}`;
-    }
-
     function appendLog(line) {
-      logPre.textContent += `[${ts()}] ${line}\n`;
+      logPre.textContent += `${line}\n`;
       if (!logPanel.hidden) logPre.scrollTop = logPre.scrollHeight;
-    }
-
-    function showBar(scanning) {
-      bar.hidden = false;
-      spinner.style.display = scanning ? '' : 'none';
     }
 
     function hideBar() {
@@ -87,7 +77,10 @@ const App = (() => {
       logPanel.hidden = true;
     }
 
-    closeBtn.addEventListener('click', hideBar, { once: true });
+    closeBtn.addEventListener('click', () => {
+      BrokerDiscovery.abort();
+      hideBar();
+    }, { once: true });
 
     detailsBtn.addEventListener('click', () => {
       const open = !logPanel.hidden;
@@ -96,7 +89,8 @@ const App = (() => {
       if (!open) logPre.scrollTop = logPre.scrollHeight;
     });
 
-    showBar(true);
+    bar.hidden = false;
+    spinner.style.display = '';
     textEl.textContent = 'Ricerca di un broker di rete…';
     actionsEl.innerHTML = '';
 
@@ -105,35 +99,30 @@ const App = (() => {
       found = await BrokerDiscovery.scan(null, appendLog);
     } catch (err) {
       appendLog(`Errore: ${err.message}`);
-      found = [];
     }
 
-    if (found.length === 0) { hideBar(); return; }
+    // Se interrotto o nessun broker → nascondi barra silenziosamente
+    const scanStatus = BrokerDiscovery.getStatus();
+    if (found.length === 0 || scanStatus.status === 'aborted') {
+      hideBar();
+      return;
+    }
 
-    showBar(false);
-    const names = found.map(b => `${b.icon} ${b.name}`).join(', ');
-    textEl.textContent = `Trovato: ${names}`;
-
-    actionsEl.innerHTML = found.map((b, i) =>
-      `<button class="disc-bar-btn" data-idx="${i}">${esc(b.name)} ${esc(b.ip)}</button>`
-    ).join('');
-
-    actionsEl.querySelectorAll('.disc-bar-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const broker = found[parseInt(btn.dataset.idx)];
-        saveBroker(broker);
-        appendLog(`Connesso a ${broker.name} su ${broker.url}`);
-        textEl.textContent = `Connesso a ${broker.name} (${broker.ip})`;
-        actionsEl.innerHTML = '';
-        agentTagline.textContent = `Connesso — ${broker.name}`;
-        // Inizializza MCP layer col broker trovato
-        const haToken = broker.haToken || null;
-        McpLayer.initFromBroker(broker.url, haToken, broker.id)
-          .then(() => appendLog(`[MCP] ${McpLayer.getTools().length} tool disponibili`))
-          .catch(e => appendLog(`[MCP] init error: ${e.message}`));
-        setTimeout(hideBar, 2500);
-      }, { once: true });
+    // Broker trovati → nascondi barra e mostra messaggio in chat
+    hideBar();
+    const names = found.map(b => `${b.icon} **${b.name}**`).join(', ');
+    addAgentMessage({
+      message: `Ho trovato ${found.length === 1 ? 'un broker' : `${found.length} broker`} nella tua rete: ${names}.\n\nVuoi che mi connetta?`,
+      _brokerFound: found,
     });
+  }
+
+  function connectBroker(broker) {
+    saveBroker(broker);
+    agentTagline.textContent = `Connesso — ${broker.name}`;
+    McpLayer.initFromBroker(broker.url, broker.haToken || null, broker.id)
+      .then(() => addAgentMessage({ message: `Connesso a **${broker.name}** su \`${broker.url}\`. ${McpLayer.getTools().length} tool disponibili.` }))
+      .catch(e => addAgentMessage({ message: `Errore connessione MCP: ${e.message}` }));
   }
 
   function saveBroker(broker) {
@@ -321,10 +310,30 @@ const App = (() => {
       <div class="msg-body">
         ${toolCard}
         <div class="msg-bubble">${fmt(result.message)}</div>
+        ${result._brokerFound ? buildBrokerButtons(result._brokerFound) : ''}
         <div class="msg-time">${nowStr()}</div>
       </div>`;
+    // Collega i bottoni broker trovati
+    if (result._brokerFound) {
+      el.querySelectorAll('.broker-connect-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const broker = result._brokerFound[parseInt(btn.dataset.idx)];
+          btn.closest('.broker-connect-row').querySelectorAll('.broker-connect-btn')
+            .forEach(b => { b.disabled = true; });
+          btn.textContent = 'Connessione…';
+          connectBroker(broker);
+        }, { once: true });
+      });
+    }
     messagesEl.appendChild(el);
     scrollToBottom();
+  }
+
+  function buildBrokerButtons(brokers) {
+    const btns = brokers.map((b, i) =>
+      `<button class="broker-connect-btn disc-bar-btn" data-idx="${i}">${esc(b.icon)} ${esc(b.name)} — ${esc(b.ip)}</button>`
+    ).join('');
+    return `<div class="broker-connect-row">${btns}</div>`;
   }
 
   function buildToolCard(result) {

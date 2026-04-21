@@ -12,21 +12,42 @@ const BrokerDiscovery = (() => {
     { id: 'shelly',        name: 'Shelly',         port: 80,   path: '/shelly', icon: '💡' },
   ];
 
-  // ── WebRTC trick: leak the device's LAN IP ──
-  function getLocalIP(log) {
+  // ── Stato condiviso della scansione ────────
+  const state = {
+    status:      'idle',   // 'idle' | 'running' | 'completed' | 'aborted'
+    aborted:     false,
+    found:       [],
+    logs:        [],
+    progress:    0,        // 0-1
+    startedAt:   null,
+    completedAt: null,
+  };
+
+  function ts() {
+    const d = new Date();
+    return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}:${d.getSeconds().toString().padStart(2,'0')}`;
+  }
+
+  function pushLog(line) {
+    state.logs.push(`[${ts()}] ${line}`);
+    if (state.logs.length > 500) state.logs.shift(); // cap
+  }
+
+  // ── WebRTC: rileva IP locale ───────────────
+  function getLocalIP() {
     return new Promise(resolve => {
       try {
-        log('WebRTC: rilevamento IP locale…');
+        pushLog('WebRTC: rilevamento IP locale…');
         const pc = new RTCPeerConnection({ iceServers: [] });
         pc.createDataChannel('');
         pc.createOffer().then(o => pc.setLocalDescription(o)).catch(() => {
-          log('WebRTC: createOffer fallito');
+          pushLog('WebRTC: createOffer fallito');
           resolve(null);
         });
 
         const timeout = setTimeout(() => {
           pc.close();
-          log('WebRTC: timeout — IP non rilevato');
+          pushLog('WebRTC: timeout — IP non rilevato');
           resolve(null);
         }, 2500);
 
@@ -36,12 +57,12 @@ const BrokerDiscovery = (() => {
           if (m && !m[1].startsWith('127.') && !m[1].startsWith('169.')) {
             clearTimeout(timeout);
             pc.close();
-            log(`WebRTC: IP locale rilevato → ${m[1]}`);
+            pushLog(`WebRTC: IP locale rilevato → ${m[1]}`);
             resolve(m[1]);
           }
         };
       } catch (err) {
-        log(`WebRTC: errore — ${err.message}`);
+        pushLog(`WebRTC: errore — ${err.message}`);
         resolve(null);
       }
     });
@@ -69,51 +90,59 @@ const BrokerDiscovery = (() => {
     }
   }
 
-  // ── Scan one subnet (x.x.x.1-254) ──
-  async function scanSubnet(base, onProgress, log) {
+  // ── Scan subnet con abort check ────────────
+  async function scanSubnet(base, onProgress) {
     const found   = [];
     const total   = 254;
     let   scanned = 0;
     const BATCH   = 40;
     const batches = Math.ceil(total / BATCH);
 
-    log(`Subnet: scansione ${base}.x — ${total} host, ${batches} batch da ${BATCH}`);
+    pushLog(`Subnet: scansione ${base}.x — ${total} host, ${batches} batch da ${BATCH}`);
 
     for (let start = 1; start <= total; start += BATCH) {
+      if (state.aborted) { pushLog('Scansione interrotta dall\'utente'); break; }
+
       const batchNum = Math.ceil(start / BATCH);
       const end = Math.min(start + BATCH - 1, total);
-      log(`Batch ${batchNum}/${batches}: probe ${base}.${start} → ${base}.${end}`);
+      pushLog(`Batch ${batchNum}/${batches}: probe ${base}.${start} → ${base}.${end}`);
 
       const ips = [];
       for (let i = start; i <= end; i++) ips.push(`${base}.${i}`);
 
       await Promise.all(ips.map(async ip => {
+        if (state.aborted) return;
         const hits = await Promise.all(
           BROKERS.map(async b => {
             const ok = await probe(ip, b.port, b.path);
-            if (ok) log(`✓ ${ip}:${b.port} → ${b.name}`);
+            if (ok) pushLog(`✓ ${ip}:${b.port} → ${b.name}`);
             return ok ? { ...b, ip, url: `http://${ip}:${b.port}` } : null;
           })
         );
-        hits.filter(Boolean).forEach(h => found.push(h));
+        hits.filter(Boolean).forEach(h => {
+          found.push(h);
+          state.found = dedupe([...state.found, h]);
+        });
         scanned++;
-        if (onProgress) onProgress(scanned / total, [...found]);
+        state.progress = scanned / total;
+        if (onProgress) onProgress(state.progress, [...state.found]);
       }));
     }
 
-    log(`Batch completati — trovati ${found.length} servizi su ${base}.x`);
+    pushLog(`Batch completati — trovati ${found.length} servizi su ${base}.x`);
     return found;
   }
 
-  // ── Probe a fixed list of IPs (localhost, 0.0.0.0, …) ──
-  async function probeFixed(ips, log) {
+  // ── Probe IP fissi (localhost) ─────────────
+  async function probeFixed(ips) {
     const found = [];
-    log(`Fixed: probe ${ips.join(', ')}`);
+    pushLog(`Fixed: probe ${ips.join(', ')}`);
     await Promise.all(ips.map(async ip => {
+      if (state.aborted) return;
       const hits = await Promise.all(
         BROKERS.map(async b => {
           const ok = await probe(ip, b.port, b.path);
-          if (ok) log(`✓ ${ip}:${b.port} → ${b.name}`);
+          if (ok) pushLog(`✓ ${ip}:${b.port} → ${b.name}`);
           return ok ? { ...b, ip, url: `http://${ip}:${b.port}` } : null;
         })
       );
@@ -122,41 +151,95 @@ const BrokerDiscovery = (() => {
     return found;
   }
 
-  // ── Public scan ──
+  // ── API pubblica ───────────────────────────
+
+  function abort() {
+    if (state.status !== 'running') return false;
+    state.aborted = true;
+    pushLog('--- scansione interrotta ---');
+    return true;
+  }
+
+  function getStatus() {
+    return {
+      status:      state.status,
+      progress:    Math.round(state.progress * 100),
+      found:       state.found.map(b => ({ name: b.name, ip: b.ip, port: b.port, url: b.url })),
+      logLines:    state.logs.length,
+      startedAt:   state.startedAt,
+      completedAt: state.completedAt,
+    };
+  }
+
+  function getLogs(last = 50) {
+    return state.logs.slice(-last);
+  }
+
+  function resetState() {
+    state.status      = 'idle';
+    state.aborted     = false;
+    state.found       = [];
+    state.logs        = [];
+    state.progress    = 0;
+    state.startedAt   = null;
+    state.completedAt = null;
+  }
+
   async function scan(onProgress, onLog) {
-    const log = onLog || (() => {});
-
-    log('--- avvio scansione broker ---');
-
-    // Always probe localhost variants first
-    const fixed = await probeFixed(['0.0.0.0', '127.0.0.1'], log);
-    if (fixed.length > 0) {
-      const found = dedupe(fixed);
-      log(`--- scansione completata: ${found.length} broker trovati (localhost) ---`);
-      return found;
+    if (state.status === 'running') {
+      pushLog('Scansione già in corso');
+      return state.found;
     }
 
-    const localIP = await getLocalIP(log);
+    resetState();
+    state.status    = 'running';
+    state.startedAt = new Date().toISOString();
 
-    let subnets;
-    if (localIP) {
-      subnets = [subnet(localIP)];
-    } else {
-      subnets = ['192.168.1', '192.168.0', '10.0.0', '172.16.0'];
-      log(`Fallback: provo subnet predefinite → ${subnets.join(', ')}`);
-    }
+    // Mirror log verso callback esterno (es. discovery bar)
+    const origPushLog = pushLog;
+    const log = line => {
+      pushLog(line);
+      if (onLog) onLog(line);
+    };
 
-    for (const base of subnets) {
-      const results = await scanSubnet(base, onProgress, log);
-      if (results.length > 0) {
-        const found = dedupe(results);
-        log(`--- scansione completata: ${found.length} broker trovati ---`);
-        return found;
+    pushLog('--- avvio scansione broker ---');
+
+    try {
+      const fixed = await probeFixed(['0.0.0.0', '127.0.0.1']);
+      if (fixed.length > 0) {
+        state.found = dedupe(fixed);
+        pushLog(`--- completata: ${state.found.length} broker trovati (localhost) ---`);
+        state.status      = state.aborted ? 'aborted' : 'completed';
+        state.completedAt = new Date().toISOString();
+        return state.found;
       }
+
+      if (!state.aborted) {
+        const localIP = await getLocalIP();
+        const subnets = localIP
+          ? [subnet(localIP)]
+          : ['192.168.1', '192.168.0', '10.0.0', '172.16.0'];
+
+        if (!localIP) pushLog(`Fallback: provo subnet predefinite → ${subnets.join(', ')}`);
+
+        for (const base of subnets) {
+          if (state.aborted) break;
+          const results = await scanSubnet(base, onProgress);
+          if (results.length > 0) {
+            state.found = dedupe(results);
+            break;
+          }
+        }
+      }
+
+      pushLog(`--- ${state.aborted ? 'interrotta' : 'completata'}: ${state.found.length} broker trovati ---`);
+    } catch (err) {
+      pushLog(`Errore inatteso: ${err.message}`);
     }
 
-    log('--- scansione completata: nessun broker trovato ---');
-    return [];
+    state.status      = state.aborted ? 'aborted' : 'completed';
+    state.completedAt = new Date().toISOString();
+    return state.found;
   }
 
   function dedupe(list) {
@@ -169,5 +252,5 @@ const BrokerDiscovery = (() => {
     });
   }
 
-  return { scan, BROKERS };
+  return { scan, abort, getStatus, getLogs, resetState, BROKERS };
 })();
