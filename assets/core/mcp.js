@@ -205,6 +205,8 @@ IMPORTANTE: prima di sbloccare chiedere sempre conferma esplicita all'utente.`,
   // ─────────────────────────────────────────
 
   async function initFromBroker(brokerUrl, brokerToken, brokerType = 'homeassistant') {
+    console.groupCollapsed('[MCP] initFromBroker');
+    console.log({ brokerUrl, brokerType, hasToken: !!brokerToken });
     registry.brokerUrl   = brokerUrl;
     registry.brokerToken = brokerToken;
     registry.brokerType  = brokerType;
@@ -213,9 +215,12 @@ IMPORTANTE: prima di sbloccare chiedere sempre conferma esplicita all'utente.`,
     if (brokerType === 'homeassistant' && brokerToken) {
       let entities = [];
       try {
+        console.log('[MCP] caricamento entità Home Assistant:', `${brokerUrl}/api/states`);
         const res = await fetch(`${brokerUrl}/api/states`, {
           headers: { Authorization: `Bearer ${brokerToken}` }
         });
+        console.log('[MCP] risposta /api/states:', res.status, res.statusText);
+        if (!res.ok) throw new Error(`Home Assistant /api/states HTTP ${res.status}`);
         entities = await res.json();
       } catch (err) {
         console.warn('[MCP] impossibile caricare entità da HA:', err.message);
@@ -236,13 +241,19 @@ IMPORTANTE: prima di sbloccare chiedere sempre conferma esplicita all'utente.`,
 
         console.log(`[MCP] espansi ${registry.dynamic.length} tool dinamici da ${entities.length} entità`);
       }
+    } else if (brokerType === 'homeassistant') {
+      console.warn('[MCP] Home Assistant connesso senza token: salto caricamento entità dinamiche');
     }
 
     try {
       localStorage.setItem('mcp_registry', JSON.stringify({
         dynamic: registry.dynamic, brokerUrl, brokerToken, brokerType
       }));
-    } catch {}
+      console.log('[MCP] registry salvato in localStorage');
+    } catch (err) {
+      console.warn('[MCP] impossibile salvare registry:', err.message);
+    }
+    console.groupEnd();
   }
 
   function loadFromCache() {

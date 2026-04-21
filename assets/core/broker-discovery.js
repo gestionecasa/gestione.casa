@@ -93,15 +93,61 @@ const BrokerDiscovery = (() => {
     return `${p[0]}.${p[1]}.${p[2]}`;
   }
 
-  // ── TCP probe ──────────────────────────────
+  function withTimeout(ms = 500) {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), ms);
+    return { ctrl, done: () => clearTimeout(tid) };
+  }
+
+  // ── Reachability probe ─────────────────────
   async function probe(ip, port, path) {
     try {
-      const ctrl = new AbortController();
-      const tid  = setTimeout(() => ctrl.abort(), 300);
+      const { ctrl, done } = withTimeout(300);
       await fetch(`http://${ip}:${port}${path}`, { signal: ctrl.signal, mode: 'no-cors', cache: 'no-store' });
-      clearTimeout(tid);
+      done();
       return true;
     } catch { return false; }
+  }
+
+  async function fetchText(ip, port, path) {
+    try {
+      const { ctrl, done } = withTimeout(700);
+      const res = await fetch(`http://${ip}:${port}${path}`, { signal: ctrl.signal, cache: 'no-store' });
+      const text = await res.text();
+      done();
+      return text;
+    } catch {
+      return null;
+    }
+  }
+
+  async function probeZigbee2Mqtt(ip) {
+    const pages = [
+      await fetchText(ip, 8080, '/'),
+      await fetchText(ip, 8080, '/index.html'),
+    ].filter(Boolean);
+
+    return pages.some(text => /zigbee2mqtt|zigbee2mqtt-frontend|z2m/i.test(text));
+  }
+
+  async function probeOpenHab(ip) {
+    const pages = [
+      await fetchText(ip, 8080, '/rest/'),
+      await fetchText(ip, 8080, '/rest'),
+      await fetchText(ip, 8080, '/'),
+    ].filter(Boolean);
+
+    return pages.some(text => /openhab|org\.openhab|openhabcloud|Main UI/i.test(text));
+  }
+
+  async function detectBroker(ip, broker) {
+    if (broker.id === 'zigbee2mqtt') {
+      return probeZigbee2Mqtt(ip);
+    }
+    if (broker.id === 'openhab') {
+      return probeOpenHab(ip);
+    }
+    return probe(ip, broker.port, broker.path);
   }
 
   // ── Probe IP fissi ─────────────────────────
@@ -112,7 +158,7 @@ const BrokerDiscovery = (() => {
       if (state.aborted) return;
       const hits = await Promise.all(
         BROKERS.map(async b => {
-          const ok = await probe(ip, b.port, b.path);
+          const ok = await detectBroker(ip, b);
           if (ok) log(`✓ ${ip}:${b.port} → ${b.name}`);
           return ok ? { ...b, ip, url: `http://${ip}:${b.port}` } : null;
         })
@@ -146,7 +192,7 @@ const BrokerDiscovery = (() => {
         if (state.aborted) return;
         const hits = await Promise.all(
           BROKERS.map(async b => {
-            const ok = await probe(ip, b.port, b.path);
+            const ok = await detectBroker(ip, b);
             if (ok) log(`✓ ${ip}:${b.port} → ${b.name}`);
             return ok ? { ...b, ip, url: `http://${ip}:${b.port}` } : null;
           })

@@ -48,15 +48,23 @@ const App = (() => {
     const h = location.hostname;
     if (window.matchMedia('(display-mode: standalone)').matches) return true;
     if (navigator.standalone) return true;
-    return h === 'localhost' || h === '127.0.0.1'
+    return isLocalhost()
       || /^192\.168\./.test(h) || /^10\./.test(h)
       || /^172\.(1[6-9]|2\d|3[01])\./.test(h)
       || h.endsWith('.local');
   }
 
+  function isLocalhost() {
+    return location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  }
+
   function runDiscovery() {
+    if (BrokerDiscovery.getStatus().status === 'running') {
+      showDiscoveryBar({ autoStart: false });
+      return;
+    }
     if (!isLocalContext()) return;
-    if (getSavedBroker()) return;
+    if (!isLocalhost() && getSavedBroker()) return;
     showDiscoveryBar({ autoStart: true });
   }
 
@@ -71,18 +79,17 @@ const App = (() => {
 
     closeBtn.addEventListener('click', () => {
       const s = BrokerDiscovery.getStatus();
-      if (s.status === 'running') {
-        BrokerDiscovery.abort();
-        return;
-      }
+      if (s.status === 'running') BrokerDiscovery.abort();
       $('discoveryBar').hidden = true;
+      $('discoveryBar').style.display = 'none';
       logPanel.hidden = true;
     });
 
     detailsBtn.addEventListener('click', () => {
       const open = !logPanel.hidden;
       logPanel.hidden = open;
-      detailsBtn.textContent = open ? 'vedi log' : 'nascondi log';
+      detailsBtn.textContent = open ? 'Log' : 'Nascondi';
+      detailsBtn.setAttribute('aria-expanded', String(!open));
       if (!open) logPre.scrollTop = logPre.scrollHeight;
     });
 
@@ -96,6 +103,8 @@ const App = (() => {
       if (evt.line) appendDiscoveryLog(evt.line);
       syncDiscoveryBar(evt.status);
     });
+
+    syncDiscoveryBar();
   }
 
   function appendDiscoveryLog(line) {
@@ -121,7 +130,8 @@ const App = (() => {
 
     syncDiscoveryLogs();
     actionsEl.innerHTML = '';
-    detailsBtn.textContent = logPanel.hidden ? 'vedi log' : 'nascondi log';
+    detailsBtn.textContent = logPanel.hidden ? 'Log' : 'Nascondi';
+    detailsBtn.setAttribute('aria-expanded', String(!logPanel.hidden));
 
     if (status.status === 'idle') {
       bar.hidden = true;
@@ -130,6 +140,7 @@ const App = (() => {
     }
 
     bar.hidden = false;
+    bar.style.display = 'flex';
 
     if (status.status === 'running') {
       spinner.style.display = '';
@@ -174,18 +185,55 @@ const App = (() => {
 
   function showDiscoveryBar({ autoStart = true } = {}) {
     bindDiscoveryUi();
-    syncDiscoveryBar();
-    if (autoStart && BrokerDiscovery.getStatus().status !== 'running') {
+    const status = BrokerDiscovery.getStatus();
+    if (status.status === 'running') {
+      syncDiscoveryBar(status);
+      return;
+    }
+    if (autoStart) {
+      showDiscoveryPending();
       BrokerDiscovery.scan();
     }
   }
 
-  function connectBroker(broker) {
-    saveBroker(broker);
-    agentTagline.textContent = `Connesso — ${broker.name}`;
-    McpLayer.initFromBroker(broker.url, broker.haToken || null, broker.id)
-      .then(() => addAgentMessage({ message: `Connesso a **${broker.name}** su \`${broker.url}\`. ${McpLayer.getTools().length} tool disponibili.` }))
-      .catch(e => addAgentMessage({ message: `Errore connessione MCP: ${e.message}` }));
+  function showDiscoveryPending() {
+    const bar     = $('discoveryBar');
+    const spinner = $('discoveryBarSpinner');
+    const textEl  = $('discoveryBarText');
+    $('discoveryBarActions').innerHTML = '';
+    $('discoveryBarDetails').textContent = 'Log';
+    $('discoveryBarDetails').setAttribute('aria-expanded', 'false');
+    spinner.style.display = '';
+    textEl.textContent = 'Ricerca broker in corso…';
+    bar.hidden = false;
+    bar.style.display = 'flex';
+  }
+
+  async function connectBroker(broker) {
+    console.groupCollapsed('[BrokerConnect] avvio connessione');
+    console.log('broker selezionato:', broker);
+    console.log('tools prima:', McpLayer.getTools().map(t => t.function?.name));
+    try {
+      saveBroker(broker);
+      console.log('broker salvato in localStorage');
+      agentTagline.textContent = `Connessione a ${broker.name}…`;
+      const startedAt = performance.now();
+      await McpLayer.initFromBroker(broker.url, broker.haToken || null, broker.id);
+      const elapsed = Math.round(performance.now() - startedAt);
+      const tools = McpLayer.getTools();
+      console.log(`MCP init completato in ${elapsed}ms`);
+      console.log('tools dopo:', tools.map(t => t.function?.name));
+      agentTagline.textContent = `Connesso — ${broker.name}`;
+      addAgentMessage({ message: `Connesso a **${broker.name}** su \`${broker.url}\`. ${tools.length} tool disponibili.` });
+      return { ok: true, tools: tools.length };
+    } catch (e) {
+      console.error('[BrokerConnect] errore connessione:', e);
+      agentTagline.textContent = 'Connessione broker fallita';
+      addAgentMessage({ message: `Errore connessione MCP a **${broker.name}** su \`${broker.url}\`: ${e.message}` });
+      return { ok: false, error: e };
+    } finally {
+      console.groupEnd();
+    }
   }
 
   function saveBroker(broker) {
@@ -379,12 +427,24 @@ const App = (() => {
     // Collega i bottoni broker trovati
     if (result._brokerFound) {
       el.querySelectorAll('.broker-connect-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', async () => {
           const broker = result._brokerFound[parseInt(btn.dataset.idx)];
-          btn.closest('.broker-connect-row').querySelectorAll('.broker-connect-btn')
-            .forEach(b => { b.disabled = true; });
+          const row = btn.closest('.broker-connect-row');
+          const allBtns = row.querySelectorAll('.broker-connect-btn');
+          console.log('[BrokerConnect] click bottone:', { index: btn.dataset.idx, broker });
+          allBtns.forEach(b => { b.disabled = true; });
           btn.textContent = 'Connessione…';
-          connectBroker(broker);
+          btn.classList.add('is-loading');
+          const result = await connectBroker(broker);
+          btn.classList.remove('is-loading');
+          if (result.ok) {
+            btn.textContent = 'Connesso';
+            btn.classList.add('is-connected');
+          } else {
+            allBtns.forEach(b => { b.disabled = false; });
+            btn.textContent = `${broker.icon ?? ''} ${broker.name} — errore, riprova`;
+            btn.classList.add('is-error');
+          }
         }, { once: true });
       });
     }
@@ -394,7 +454,7 @@ const App = (() => {
 
   function buildBrokerButtons(brokers) {
     const btns = brokers.map((b, i) =>
-      `<button class="broker-connect-btn disc-bar-btn" data-idx="${i}">${esc(b.icon)} ${esc(b.name)} — ${esc(b.ip)}</button>`
+      `<button class="broker-connect-btn disc-bar-btn" data-idx="${i}">${esc(b.icon)} ${esc(b.name)}<span>${esc(b.ip)}:${esc(String(b.port ?? ''))}</span></button>`
     ).join('');
     return `<div class="broker-connect-row">${btns}</div>`;
   }
