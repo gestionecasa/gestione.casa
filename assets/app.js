@@ -34,6 +34,107 @@ const App = (() => {
     bindEvents();
     initMic();
     updateInputLayout();
+    runDiscovery();
+  }
+
+  // ── BROKER DISCOVERY (background) ─────────
+  function isLocalContext() {
+    const h = location.hostname;
+    if (window.matchMedia('(display-mode: standalone)').matches) return true;
+    if (navigator.standalone) return true;
+    return h === 'localhost' || h === '127.0.0.1'
+      || /^192\.168\./.test(h) || /^10\./.test(h)
+      || /^172\.(1[6-9]|2\d|3[01])\./.test(h)
+      || h.endsWith('.local');
+  }
+
+  function runDiscovery() {
+    if (!isLocalContext()) return;
+    if (getSavedBroker()) return;
+    // fire-and-forget
+    _doDiscovery();
+  }
+
+  async function _doDiscovery() {
+    const bar        = $('discoveryBar');
+    const spinner    = $('discoveryBarSpinner');
+    const textEl     = $('discoveryBarText');
+    const actionsEl  = $('discoveryBarActions');
+    const closeBtn   = $('discoveryBarClose');
+    const detailsBtn = $('discoveryBarDetails');
+    const logPanel   = $('discoveryLog');
+    const logPre     = $('discoveryLogPre');
+
+    function ts() {
+      const d = new Date();
+      return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}:${d.getSeconds().toString().padStart(2,'0')}`;
+    }
+
+    function appendLog(line) {
+      logPre.textContent += `[${ts()}] ${line}\n`;
+      if (!logPanel.hidden) logPre.scrollTop = logPre.scrollHeight;
+    }
+
+    function showBar(scanning) {
+      bar.hidden = false;
+      spinner.style.display = scanning ? '' : 'none';
+    }
+
+    function hideBar() {
+      bar.hidden = true;
+      logPanel.hidden = true;
+    }
+
+    closeBtn.addEventListener('click', hideBar, { once: true });
+
+    detailsBtn.addEventListener('click', () => {
+      const open = !logPanel.hidden;
+      logPanel.hidden = open;
+      detailsBtn.textContent = open ? 'vedi dettagli' : 'nascondi';
+      if (!open) logPre.scrollTop = logPre.scrollHeight;
+    });
+
+    showBar(true);
+    textEl.textContent = 'Ricerca di un broker di rete…';
+    actionsEl.innerHTML = '';
+
+    let found = [];
+    try {
+      found = await BrokerDiscovery.scan(null, appendLog);
+    } catch (err) {
+      appendLog(`Errore: ${err.message}`);
+      found = [];
+    }
+
+    if (found.length === 0) { hideBar(); return; }
+
+    showBar(false);
+    const names = found.map(b => `${b.icon} ${b.name}`).join(', ');
+    textEl.textContent = `Trovato: ${names}`;
+
+    actionsEl.innerHTML = found.map((b, i) =>
+      `<button class="disc-bar-btn" data-idx="${i}">${esc(b.name)} ${esc(b.ip)}</button>`
+    ).join('');
+
+    actionsEl.querySelectorAll('.disc-bar-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const broker = found[parseInt(btn.dataset.idx)];
+        saveBroker(broker);
+        appendLog(`Connesso a ${broker.name} su ${broker.url}`);
+        textEl.textContent = `Connesso a ${broker.name} (${broker.ip})`;
+        actionsEl.innerHTML = '';
+        agentTagline.textContent = `Connesso — ${broker.name}`;
+        setTimeout(hideBar, 2500);
+      }, { once: true });
+    });
+  }
+
+  function saveBroker(broker) {
+    try { localStorage.setItem('hc-broker', JSON.stringify(broker)); } catch {}
+  }
+
+  function getSavedBroker() {
+    try { return JSON.parse(localStorage.getItem('hc-broker')); } catch { return null; }
   }
 
   // ── SIDEBAR ───────────────────────────────

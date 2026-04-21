@@ -1,5 +1,8 @@
 PORT ?= 8765
 
+dev:
+	@python3 dev-server.py $(PORT)
+
 serve:
 	@echo ""
 	@echo "  ⌂  Hey Casa — http://localhost:$(PORT)"

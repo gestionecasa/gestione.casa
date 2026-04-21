@@ -1016,3 +1016,119 @@ body {
   .msg-body { max-width: 88%; }
   .welcome-title { font-size: 20px; }
 }
+
+/* ── BROKER DISCOVERY BAR ──────────────────── */
+.discovery-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px 7px 12px;
+  background: var(--bg-tool);
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  min-height: 36px;
+  animation: disc-bar-in .25s ease;
+}
+
+@keyframes disc-bar-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.discovery-bar-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.discovery-bar-text {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.discovery-bar-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.disc-bar-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s;
+  white-space: nowrap;
+}
+
+.disc-bar-btn:hover { background: var(--accent-hover); }
+
+.discovery-bar-close {
+  background: none;
+  border: none;
+  color: var(--text-light);
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 4px;
+  flex-shrink: 0;
+  transition: color .15s;
+}
+
+.discovery-bar-close:hover { color: var(--text); }
+
+/* ── DISCOVERY LOG PANEL ───────────────────── */
+.discovery-bar-details {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 11.5px;
+  cursor: pointer;
+  padding: 2px 4px;
+  flex-shrink: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color .15s;
+}
+
+.discovery-bar-details:hover { color: var(--accent-hover); }
+
+.discovery-log {
+  background: #1b1b2f;
+  border-bottom: 1px solid var(--border);
+  max-height: 180px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.discovery-log-pre {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.6;
+  color: #a0a8c8;
+  padding: 10px 14px;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 180px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #3a3a5c transparent;
+}
+
+.discovery-log-pre::-webkit-scrollbar { width: 4px; }
+.discovery-log-pre::-webkit-scrollbar-thumb { background: #3a3a5c; border-radius: 2px; }

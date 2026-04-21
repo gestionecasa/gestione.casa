@@ -27,20 +27,6 @@
   <link rel="apple-touch-icon" sizes="152x152" href="assets/images/icons/icon-152x152.png">
 </head>
 <body>
-<!-- ── BROKER DISCOVERY OVERLAY ─────────────── -->
-<div class="discovery-overlay" id="discoveryOverlay">
-  <div class="discovery-card">
-    <img src="assets/images/logo.png" alt="Hey Casa" class="discovery-logo">
-    <h2 class="discovery-title"><span class="hey-word">Hey</span> Casa</h2>
-    <p class="discovery-status" id="discoveryStatus">Sto cercando dispositivi nella tua rete…</p>
-    <div class="discovery-progress-wrap">
-      <div class="discovery-progress-bar" id="discoveryProgress"></div>
-    </div>
-    <div class="discovery-results" id="discoveryResults"></div>
-    <div class="discovery-actions" id="discoveryActions"></div>
-  </div>
-</div>
-
 <div class="layout">
 
   <!-- ── SIDEBAR ─────────────────────────── -->
@@ -97,6 +83,17 @@
         </svg>
       </button>
     </header>
+
+    <div class="discovery-bar" id="discoveryBar" hidden>
+      <span class="discovery-bar-spinner" id="discoveryBarSpinner"></span>
+      <span class="discovery-bar-text" id="discoveryBarText"></span>
+      <div class="discovery-bar-actions" id="discoveryBarActions"></div>
+      <button class="discovery-bar-details" id="discoveryBarDetails">vedi dettagli</button>
+      <button class="discovery-bar-close" id="discoveryBarClose" aria-label="Chiudi">✕</button>
+    </div>
+    <div class="discovery-log" id="discoveryLog" hidden>
+      <pre class="discovery-log-pre" id="discoveryLogPre"></pre>
+    </div>
 
     <div class="messages-container" id="messagesContainer">
       <div class="messages" id="messages"></div>
