@@ -348,13 +348,16 @@ IMPORTANTE: prima di sbloccare chiedere sempre conferma esplicita all'utente.`,
       case 'start_broker_scan': {
         const s = BrokerDiscovery.getStatus();
         if (s.status === 'running') {
+          if (typeof App !== 'undefined') App.showDiscoveryBar();
           return { started: false, reason: 'Scansione già in corso', progress: s.progress, found: s.found };
         }
-        // Avvia in background — non aspettiamo il completamento
-        BrokerDiscovery.scan().then(found => {
-          console.log('[MCP] scan completata:', found.length, 'broker');
-        });
-        return { started: true, message: 'Scansione avviata in background. Usa get_broker_scan_status per monitorare.' };
+        // Mostra barra UI e avvia scan (showDiscoveryBar chiama scan internamente)
+        if (typeof App !== 'undefined') {
+          App.showDiscoveryBar();
+        } else {
+          BrokerDiscovery.scan();
+        }
+        return { started: true, message: 'Scansione avviata. La barra di ricerca in alto mostra l\'avanzamento.' };
       }
 
       case 'stop_broker_scan': {

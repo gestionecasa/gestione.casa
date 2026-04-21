@@ -53,11 +53,13 @@ const App = (() => {
   function runDiscovery() {
     if (!isLocalContext()) return;
     if (getSavedBroker()) return;
-    // fire-and-forget
-    _doDiscovery();
+    showDiscoveryBar();
   }
 
-  async function _doDiscovery() {
+  // Mostra la barra e gestisce il ciclo completo di una scansione.
+  // Può essere chiamata dall'init O dal tool MCP start_broker_scan.
+  // Se una scan è già in corso la aggancia senza riavviarla.
+  async function showDiscoveryBar() {
     const bar        = $('discoveryBar');
     const spinner    = $('discoveryBarSpinner');
     const textEl     = $('discoveryBarText');
@@ -66,6 +68,9 @@ const App = (() => {
     const detailsBtn = $('discoveryBarDetails');
     const logPanel   = $('discoveryLog');
     const logPre     = $('discoveryLogPre');
+
+    // Evita doppia istanza se barra già visibile
+    if (!bar.hidden) return;
 
     function appendLog(line) {
       logPre.textContent += `${line}\n`;
@@ -93,35 +98,49 @@ const App = (() => {
     spinner.style.display = '';
     textEl.textContent = 'Ricerca di un broker di rete…';
     actionsEl.innerHTML = '';
+    logPre.textContent = '';
+    BrokerDiscovery.getLogs().forEach(l => appendLog(l));
 
     let found = [];
     try {
-      const TIMEOUT_MS = 60_000;
-      const timeoutP = new Promise(res => setTimeout(() => res('__timeout__'), TIMEOUT_MS));
-      console.log('[Discovery] avvio scan…');
-      const race = await Promise.race([BrokerDiscovery.scan(null, appendLog), timeoutP]);
-      if (race === '__timeout__') {
-        console.warn('[Discovery] scan timeout — nascondo barra');
-        BrokerDiscovery.abort();
-        hideBar();
-        return;
+      const alreadyRunning = BrokerDiscovery.getStatus().status === 'running';
+
+      if (alreadyRunning) {
+        // Aspetta il completamento con polling
+        found = await new Promise((resolve) => {
+          const deadline = Date.now() + 60_000;
+          const tid = setInterval(() => {
+            const s = BrokerDiscovery.getStatus();
+            BrokerDiscovery.getLogs(500).forEach(l => {
+              if (!logPre.textContent.includes(l)) appendLog(l);
+            });
+            if (s.status !== 'running' || Date.now() > deadline) {
+              clearInterval(tid);
+              resolve(s.found.map(b => ({ ...b })));
+            }
+          }, 600);
+        });
+      } else {
+        const TIMEOUT_MS = 60_000;
+        const timeoutP = new Promise(res => setTimeout(() => res('__timeout__'), TIMEOUT_MS));
+        const race = await Promise.race([BrokerDiscovery.scan(null, appendLog), timeoutP]);
+        if (race === '__timeout__') {
+          BrokerDiscovery.abort();
+          hideBar();
+          return;
+        }
+        found = race ?? [];
       }
-      found = race ?? [];
-      console.log('[Discovery] scan completata, trovati:', found.length);
     } catch (err) {
-      console.error('[Discovery] errore:', err);
       appendLog(`Errore: ${err.message}`);
     }
 
-    // Se interrotto o nessun broker → nascondi barra silenziosamente
     const scanStatus = BrokerDiscovery.getStatus();
-    console.log('[Discovery] status finale:', scanStatus.status, 'found:', found.length);
     if (found.length === 0 || scanStatus.status === 'aborted') {
       hideBar();
       return;
     }
 
-    // Broker trovati → nascondi barra e mostra messaggio in chat
     hideBar();
     const names = found.map(b => `${b.icon} **${b.name}**`).join(', ');
     addAgentMessage({
@@ -394,13 +413,12 @@ const App = (() => {
       return;
     }
 
-    // Step 1 — typing indicator
+    // Step 1 — typing indicator (rimane fino alla risposta)
     const typingEl = showTyping();
-    await sleep(500);
-    removeEl(typingEl);
 
     // Step 2 — process via active agent
     const result = await activeAgent().process(text);
+    removeEl(typingEl);
 
     // Step 3 — if tool call, show spinner briefly
     if (result.tool) {
@@ -655,7 +673,7 @@ const App = (() => {
     }
   }
 
-  return { init, renderAuthWidget };
+  return { init, renderAuthWidget, showDiscoveryBar };
 })();
 
 document.addEventListener('DOMContentLoaded', async () => {
