@@ -17,25 +17,29 @@ const App = (() => {
   const agentTagline  = $('agentTagline');
 
   let isBusy = false;
+  const sidebarRevealed = new Set(); // keys of sidebar values already revealed
 
   const INIT_SUGGESTIONS = [
-    'Accendi le luci del soggiorno',
-    "Com'è messa casa?",
-    'Quanto paghiamo di luce?',
-    'Avvisami quando finisce la lavatrice',
-    'Quando scade il contratto gas?',
-    'Spegni la TV dopo mezzanotte',
+    'Hey Casa, accendi le luci del soggiorno',
+    "Hey Casa, com'è messa casa?",
+    'Hey Casa, quanto paghiamo di luce?',
+    'Hey Casa, quando scade il contratto gas?',
   ];
 
   // ── INIT ───────────────────────────────────
   function init() {
     renderWelcome();
-    renderSuggestions(INIT_SUGGESTIONS.slice(0, 4));
+    renderSuggestions(INIT_SUGGESTIONS);
     renderSidebar();
     bindEvents();
+    initMic();
   }
 
   // ── SIDEBAR ───────────────────────────────
+  function ask(prompt) {
+    return `<span class="val-ask" data-prompt="${esc(prompt)}" title="Clicca per sapere">??</span>`;
+  }
+
   function renderSidebar() {
     const s = FakeAgent.getState();
     const on = Object.values(s.devices).filter(d => d.type === 'luce' && d.on);
@@ -43,65 +47,107 @@ const App = (() => {
     const activeAppl  = Object.values(s.devices).filter(d => d.type === 'elettrodomestico' && d.on);
     const risc = s.devices['riscaldamento'];
 
+    // After a value has been revealed (post-click), show the real value; otherwise show ??
+    // We track revealed state per card key via sidebarRevealed set.
+    const R = sidebarRevealed;
+
     statusGrid.innerHTML = `
-      <div class="status-card">
+      <div class="status-card" data-key="luci">
         <div class="status-card-icon">💡</div>
-        <div class="status-card-value ${on.length > 0 ? 'status-on' : 'status-off'}">${on.length}/${totalLights}</div>
+        <div class="status-card-value ${on.length > 0 ? 'status-on' : 'status-off'}">
+          ${R.has('luci') ? `${on.length}/${totalLights}` : ask('Quante luci ho accese adesso?')}
+        </div>
         <div class="status-card-label">Luci accese</div>
       </div>
-      <div class="status-card">
+      <div class="status-card" data-key="temp">
         <div class="status-card-icon">🌡️</div>
-        <div class="status-card-value">${s.temperature.inside}°</div>
-        <div class="status-card-label">Dentro · ${s.temperature.outside}° fuori</div>
+        <div class="status-card-value">
+          ${R.has('temp') ? `${s.temperature.inside}°` : ask('Che temperatura fa in casa?')}
+        </div>
+        <div class="status-card-label">Dentro${R.has('temp') ? ` · ${s.temperature.outside}° fuori` : ''}</div>
       </div>
-      <div class="status-card">
+      <div class="status-card" data-key="risc">
         <div class="status-card-icon">🔥</div>
-        <div class="status-card-value ${risc.on ? 'status-active' : 'status-off'}">${risc.on ? `${risc.temp}°C` : 'OFF'}</div>
+        <div class="status-card-value ${risc.on ? 'status-active' : 'status-off'}">
+          ${R.has('risc') ? (risc.on ? `${risc.temp}°C` : 'OFF') : ask('Com\'è il riscaldamento adesso?')}
+        </div>
         <div class="status-card-label">Riscaldamento</div>
       </div>
-      <div class="status-card">
+      <div class="status-card" data-key="appl">
         <div class="status-card-icon">🔌</div>
-        <div class="status-card-value ${activeAppl.length > 0 ? 'status-active' : ''}">${activeAppl.length}</div>
+        <div class="status-card-value ${activeAppl.length > 0 ? 'status-active' : ''}">
+          ${R.has('appl') ? activeAppl.length : ask('Quali elettrodomestici sono accesi?')}
+        </div>
         <div class="status-card-label">Elettrodomestici</div>
       </div>
     `;
 
     deadlinesList.innerHTML = s.deadlines.map(d => {
       const cls = d.daysLeft <= 14 ? 'urgent' : d.daysLeft <= 45 ? 'soon' : 'ok';
+      const dKey = `dead-${d.id}`;
       return `
         <div class="deadline-item">
           <div class="deadline-dot ${cls}"></div>
-          <span class="deadline-name">${d.name}</span>
-          <span class="deadline-days">${d.daysLeft}g</span>
+          <span class="deadline-name">${esc(d.name)}</span>
+          <span class="deadline-days">
+            ${R.has(dKey) ? `${d.daysLeft}g` : ask(`Quando scade ${d.name}?`)}
+          </span>
         </div>`;
     }).join('');
 
     expensesMini.innerHTML = [
-      { icon: '⚡', label: 'Luce',  key: 'luce'  },
-      { icon: '🔥', label: 'Gas',   key: 'gas'   },
-      { icon: '💧', label: 'Acqua', key: 'acqua' },
-    ].map(({ icon, label, key }) => {
+      { icon: '⚡', label: 'Luce',  key: 'luce',  prompt: 'Quanto paghiamo di luce questo mese?'  },
+      { icon: '🔥', label: 'Gas',   key: 'gas',   prompt: 'Quanto paghiamo di gas questo mese?'   },
+      { icon: '💧', label: 'Acqua', key: 'acqua', prompt: 'Quanto paghiamo di acqua questo mese?' },
+    ].map(({ icon, label, key, prompt }) => {
       const e = s.expenses[key];
       const tCls  = e.vsLastYear > 0 ? 'trend-up' : e.vsLastYear < 0 ? 'trend-down' : 'trend-flat';
       const tIcon = e.vsLastYear > 0 ? '↑' : e.vsLastYear < 0 ? '↓' : '→';
+      const eKey  = `exp-${key}`;
       return `
         <div class="expense-item">
           <span class="expense-cat">${icon} ${label}</span>
-          <span class="expense-amount">€${e.thisMonth}<span class="expense-trend ${tCls}">${tIcon}</span></span>
+          <span class="expense-amount">
+            ${R.has(eKey)
+              ? `€${e.thisMonth}<span class="expense-trend ${tCls}">${tIcon}</span>`
+              : ask(prompt)}
+          </span>
         </div>`;
     }).join('');
   }
 
   // ── MESSAGES ──────────────────────────────
   function renderWelcome() {
-    const h = new Date().getHours();
-    const gr = h < 12 ? 'Buongiorno' : h < 18 ? 'Buon pomeriggio' : 'Buonasera';
+    const examples = [
+      { icon: '💡', text: 'accendi le luci del soggiorno' },
+      { icon: '💶', text: 'quanto paghiamo di luce?' },
+      { icon: '🔄', text: 'avvisami quando finisce la lavatrice' },
+      { icon: '📅', text: 'quando scade il contratto gas?' },
+      { icon: '🌡️', text: 'che temperatura fa in casa?' },
+    ];
     messagesEl.innerHTML = `
       <div class="welcome-msg">
-        <div class="welcome-icon">⌂</div>
-        <div class="welcome-title">${gr}!</div>
-        <div class="welcome-sub">Sono <strong>Casa</strong>, il tuo agente domestico. Posso controllare dispositivi, tenere traccia delle spese e gestire le scadenze di casa.<br>Cosa vuoi fare?</div>
+        <img src="assets/images/logo.png" alt="Casa" class="welcome-logo">
+        <div class="welcome-hey">Hey</div>
+        <div class="welcome-casa">Casa.</div>
+        <div class="welcome-sub">Il tuo agente domestico. Controlla dispositivi, tieni traccia delle spese, gestisce le scadenze — tutto privato, tutto tuo.</div>
+        <div class="welcome-examples">
+          ${examples.map(e => `
+            <button class="welcome-example" data-text="Hey Casa, ${esc(e.text)}">
+              <span class="welcome-example-icon">${e.icon}</span>
+              <span><em>Hey Casa</em>, ${esc(e.text)}</span>
+            </button>`).join('')}
+        </div>
       </div>`;
+
+    // Bind example clicks
+    messagesEl.querySelectorAll('.welcome-example').forEach(btn => {
+      btn.addEventListener('click', () => {
+        input.value = btn.dataset.text;
+        sendBtn.disabled = false;
+        send();
+      });
+    });
   }
 
   function addUserMessage(text) {
@@ -193,7 +239,8 @@ const App = (() => {
     input.value = '';
     input.style.height = 'auto';
     sendBtn.disabled = true;
-    agentTagline.textContent = 'Sto pensando…';
+    agentTagline.textContent = 'Sto elaborando…';
+    $('agentAvatar').classList.add('thinking');
 
     // Remove welcome screen on first message
     const welcome = messagesEl.querySelector('.welcome-msg');
@@ -223,6 +270,7 @@ const App = (() => {
     renderSuggestions(contextualSuggestions(text, result));
 
     agentTagline.textContent = 'Pronto — cosa vuoi fare?';
+    $('agentAvatar').classList.remove('thinking');
     isBusy = false;
   }
 
@@ -290,8 +338,9 @@ const App = (() => {
     clearBtn.addEventListener('click', () => {
       messagesEl.innerHTML = '';
       renderWelcome();
-      renderSuggestions(INIT_SUGGESTIONS.slice(0, 4));
+      renderSuggestions(INIT_SUGGESTIONS);
       agentTagline.textContent = 'Pronto — cosa vuoi fare?';
+      $('agentAvatar').classList.remove('thinking', 'listening');
     });
 
     suggestionsRow.addEventListener('click', e => {
@@ -317,6 +366,78 @@ const App = (() => {
       sidebar.classList.remove('open');
       overlay.classList.remove('active');
     });
+
+    // Click on sidebar ?? placeholders → compose & send prompt
+    sidebar.addEventListener('click', e => {
+      const span = e.target.closest('.val-ask');
+      if (!span) return;
+      const prompt = span.dataset.prompt;
+      if (!prompt) return;
+
+      // Mark the parent card/item key as revealed for next re-render
+      const card = span.closest('[data-key]');
+      if (card) sidebarRevealed.add(card.dataset.key);
+      // For deadline/expense items, infer key from prompt text
+      const deadlineMatch = prompt.match(/scade (.+)\?/i);
+      if (deadlineMatch) {
+        const id = FakeAgent.getState().deadlines.find(d => d.name === deadlineMatch[1])?.id;
+        if (id) sidebarRevealed.add(`dead-${id}`);
+      }
+      const expMatch = prompt.match(/di (luce|gas|acqua)/i);
+      if (expMatch) sidebarRevealed.add(`exp-${expMatch[1].toLowerCase()}`);
+
+      // Send as chat message
+      input.value = prompt;
+      sendBtn.disabled = false;
+      send();
+    });
+  }
+
+  // ── MIC / WEB SPEECH API ──────────────────
+  function initMic() {
+    const micBtn = $('micBtn');
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { micBtn.classList.add('hidden'); return; }
+
+    const rec = new SR();
+    rec.lang = 'it-IT';
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+
+    let listening = false;
+
+    function startListening() {
+      if (isBusy) return;
+      listening = true;
+      rec.start();
+      micBtn.classList.add('listening');
+      $('agentAvatar').classList.add('listening');
+      input.placeholder = 'Sto ascoltando…';
+      agentTagline.textContent = '🎙 In ascolto…';
+    }
+
+    function stopListening() {
+      listening = false;
+      micBtn.classList.remove('listening');
+      $('agentAvatar').classList.remove('listening');
+      input.placeholder = 'Hey Casa, …';
+      agentTagline.textContent = 'Pronto — cosa vuoi fare?';
+    }
+
+    micBtn.addEventListener('click', () => {
+      listening ? rec.stop() : startListening();
+    });
+
+    rec.onresult = e => {
+      const transcript = e.results[0][0].transcript;
+      stopListening();
+      input.value = transcript;
+      sendBtn.disabled = false;
+      send();
+    };
+
+    rec.onend  = () => { if (listening) stopListening(); };
+    rec.onerror = () => stopListening();
   }
 
   return { init };

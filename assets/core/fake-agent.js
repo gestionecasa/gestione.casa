@@ -39,9 +39,10 @@ const FakeAgent = (() => {
   // TEXT HELPERS
   // ─────────────────────────────────────────
 
-  // Normalize: lowercase + strip accents + collapse spaces
+  // Normalize: strip "hey casa" activation phrase, then lowercase + strip accents
   function norm(s) {
     return s.toLowerCase()
+      .replace(/^\s*(hey\s+)?casa[,!\s]*/i, '')
       .replace(/[àáâã]/g, 'a').replace(/[èéêë]/g, 'e')
       .replace(/[ìíî]/g, 'i').replace(/[òóô]/g, 'o')
       .replace(/[ùúû]/g, 'u')

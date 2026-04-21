@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Casa — Agente Domestico</title>
+  <title>Hey Casa — Il tuo agente domestico</title>
   <link rel="stylesheet" href="assets/style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⌂</text></svg>">
 </head>
@@ -14,8 +14,7 @@
   <aside class="sidebar" id="sidebar">
 
     <div class="sidebar-brand">
-      <span class="brand-icon">⌂</span>
-      <span class="brand-name">casa</span>
+      <img src="assets/images/logo.png" alt="Casa" class="brand-logo">
       <span class="brand-tag">demo</span>
     </div>
 
@@ -49,9 +48,11 @@
       </button>
 
       <div class="agent-identity">
-        <div class="agent-avatar">⌂</div>
+        <div class="agent-avatar" id="agentAvatar">
+          <span class="avatar-orb" id="avatarOrb"></span>
+        </div>
         <div>
-          <span class="agent-name">Casa</span>
+          <span class="agent-name"><span class="hey-word">Hey</span> Casa</span>
           <span class="agent-tagline" id="agentTagline">Pronto — cosa vuoi fare?</span>
         </div>
       </div>
@@ -74,12 +75,20 @@
       <div class="input-bar">
         <textarea
           id="userInput"
-          placeholder="Scrivi a Casa…"
+          placeholder="Hey Casa, …"
           rows="1"
           autocomplete="off"
           spellcheck="true"
           autofocus
         ></textarea>
+        <button class="mic-btn" id="micBtn" aria-label="Parla con Casa" title="Parla con Casa">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+            <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <line x1="8"  y1="23" x2="16" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
         <button class="send-btn" id="sendBtn" disabled aria-label="Invia">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
             <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
@@ -87,8 +96,8 @@
         </button>
       </div>
 
-      <div class="input-hint">
-        Premi <kbd>Enter</kbd> per inviare &nbsp;·&nbsp; <kbd>Shift+Enter</kbd> per a capo
+      <div class="input-hint" id="inputHint">
+        Premi <kbd>Enter</kbd> per inviare &nbsp;·&nbsp; <kbd>Shift+Enter</kbd> per a capo &nbsp;·&nbsp; <kbd>🎙</kbd> per parlare
       </div>
     </div>
 
