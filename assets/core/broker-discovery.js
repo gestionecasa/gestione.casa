@@ -157,6 +157,40 @@ const BrokerDiscovery = (() => {
     return probe(ip, broker.port, broker.path);
   }
 
+  async function diagnoseIp(ip) {
+    const startedAt = performance.now();
+    const results = await Promise.all(BROKERS.map(async broker => {
+      const t0 = performance.now();
+      try {
+        const ok = await detectBroker(ip, broker);
+        return {
+          ...broker,
+          ip,
+          url: `http://${ip}:${broker.port}`,
+          ok,
+          elapsed: Math.round(performance.now() - t0),
+          note: ok ? 'fingerprint/porta compatibile' : 'nessuna risposta valida',
+        };
+      } catch (err) {
+        return {
+          ...broker,
+          ip,
+          url: `http://${ip}:${broker.port}`,
+          ok: false,
+          elapsed: Math.round(performance.now() - t0),
+          note: err.message,
+        };
+      }
+    }));
+
+    return {
+      ip,
+      elapsed: Math.round(performance.now() - startedAt),
+      results,
+      found: results.filter(r => r.ok),
+    };
+  }
+
   // ── Probe IP fissi ─────────────────────────
   async function probeFixed(ips, log) {
     const found = [];
@@ -309,5 +343,5 @@ const BrokerDiscovery = (() => {
     });
   }
 
-  return { scan, abort, getStatus, getLogs, resetState, onChange, BROKERS };
+  return { scan, abort, getStatus, getLogs, resetState, onChange, diagnoseIp, BROKERS };
 })();

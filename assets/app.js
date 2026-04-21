@@ -541,7 +541,7 @@ const App = (() => {
     const commandResult = await handleLocalCommand(text);
     if (commandResult) {
       addAgentMessage(commandResult);
-      renderSuggestions(['/install', '/uninstall', '/cache clean', 'Stato casa']);
+      renderSuggestions(['/ping 192.168.1.10', '/install', '/cache clean', 'Stato casa']);
 
       agentTagline.textContent = 'Pronto — cosa vuoi fare?';
       $('agentAvatar').classList.remove('thinking');
@@ -597,6 +597,9 @@ const App = (() => {
 
   async function handleLocalCommand(text) {
     const command = text.trim().toLowerCase();
+    const pingMatch = text.trim().match(/^\/ping\s+([a-z0-9.-]+)$/i);
+    if (pingMatch) return runPingCommand(pingMatch[1]);
+
     if (!['/install', '/uninstall', '/cache clean'].includes(command)) return null;
 
     if (!window.HeyCasaPWA) {
@@ -610,6 +613,48 @@ const App = (() => {
     if (command === '/install') return window.HeyCasaPWA.install();
     if (command === '/uninstall') return window.HeyCasaPWA.uninstall();
     return window.HeyCasaPWA.cleanCache();
+  }
+
+  async function runPingCommand(ip) {
+    if (!isValidLanHost(ip)) {
+      return {
+        tool: 'broker_ping',
+        toolResult: 'host non valido',
+        message: 'Uso: `/ping 192.168.1.10` oppure `/ping hostname.local`. Host ammessi: IPv4, `localhost`, nomi `.local`.',
+      };
+    }
+
+    console.groupCollapsed('[BrokerPing] diagnose IP');
+    console.log('target:', ip);
+    const report = await BrokerDiscovery.diagnoseIp(ip);
+    console.table(report.results.map(r => ({
+      broker: r.name,
+      url: r.url,
+      ok: r.ok,
+      ms: r.elapsed,
+      note: r.note,
+    })));
+    console.log('report:', report);
+    console.groupEnd();
+
+    const lines = report.results.map(r => {
+      const status = r.ok ? 'OK' : 'NO';
+      return `${status} ${r.icon} ${r.name} — \`${r.url}\` (${r.elapsed}ms)`;
+    }).join('\n');
+
+    const found = report.found.length
+      ? `\n\nTrovati: ${report.found.map(r => `**${r.name}**`).join(', ')}.`
+      : '\n\nNessun broker riconosciuto su questo IP.';
+
+    return {
+      tool: 'broker_ping',
+      toolResult: `${report.found.length}/${report.results.length} broker`,
+      message: `Diagnostica discovery su \`${report.ip}\` completata in ${report.elapsed}ms.\n\n${lines}${found}\n\nDettagli completi in console: gruppo \`[BrokerPing]\`.`,
+    };
+  }
+
+  function isValidLanHost(host) {
+    return /^(localhost|(?:\d{1,3}\.){3}\d{1,3}|[a-z0-9-]+(?:\.[a-z0-9-]+)*\.local)$/i.test(host);
   }
 
   // ── UTILS ─────────────────────────────────
