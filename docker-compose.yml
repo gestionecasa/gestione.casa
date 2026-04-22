@@ -10,3 +10,12 @@ services:
       - "8123:8123"
     privileged: true
     restart: unless-stopped
+
+  broker:
+    image: heycasa/broker
+    container_name: broker
+    environment:
+      - TZ=Europe/Rome
+    network_mode: host
+    privileged: true
+    restart: unless-stopped

@@ -4,6 +4,7 @@
 const BrokerDiscovery = (() => {
 
   const BROKERS = [
+    { id: 'heycasa',       name: 'HeyCasa Broker', port: 29001, path: '/',       icon: '⌂' },
     { id: 'homeassistant', name: 'Home Assistant', port: 8123, path: '/api/',   icon: '🏠' },
     { id: 'nodered',       name: 'Node-RED',       port: 1880, path: '/',       icon: '🔴' },
     { id: 'mqtt',          name: 'MQTT',           port: 9001, path: '/',       icon: '📡' },
@@ -147,7 +148,44 @@ const BrokerDiscovery = (() => {
     return pages.some(text => /openhab|org\.openhab|openhabcloud|Main UI/i.test(text));
   }
 
+  async function probeHeyCasa(ip) {
+    return new Promise(resolve => {
+      let settled = false;
+      let ws = null;
+      const finish = ok => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        try { if (ws) ws.close(); } catch {}
+        resolve(ok);
+      };
+      const timer = setTimeout(() => finish(false), 900);
+
+      try {
+        ws = new WebSocket(`ws://${ip}:29001/ws`);
+        ws.addEventListener('message', event => {
+          try {
+            const msg = JSON.parse(event.data);
+            finish(msg.type === 'hello' && !!msg.data?.local_ip);
+          } catch {
+            finish(false);
+          }
+        });
+        ws.addEventListener('open', () => {
+          try { ws.send(JSON.stringify({ id: 1, command: 'info' })); } catch {}
+        });
+        ws.addEventListener('error', () => finish(false));
+        ws.addEventListener('close', () => finish(false));
+      } catch {
+        finish(false);
+      }
+    });
+  }
+
   async function detectBroker(ip, broker) {
+    if (broker.id === 'heycasa') {
+      return probeHeyCasa(ip);
+    }
     if (broker.id === 'zigbee2mqtt') {
       return probeZigbee2Mqtt(ip);
     }

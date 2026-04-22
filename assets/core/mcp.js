@@ -189,6 +189,100 @@ IMPORTANTE: prima di sbloccare chiedere sempre conferma esplicita all'utente.`,
     })
   };
 
+  const HEYCASA_TOOLS = [
+    {
+      type: 'function',
+      function: {
+        name: 'get_lan_broker_info',
+        description: `Legge le informazioni del broker HeyCasa connesso: host, IP LAN rilevato e processo.
+Usare per verificare che il broker LAN sia operativo e quale macchina vede la rete dell'host.`,
+        parameters: { type: 'object', properties: {}, required: [] }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'scan_lan_devices',
+        description: `Scansiona la LAN tramite il broker HeyCasa e restituisce gli host raggiungibili.
+Usare quando l'utente chiede "che dispositivi ci sono in rete?", "scansiona la LAN",
+"trova dispositivi", oppure prima di cercare un device specifico come Google Home, Chromecast, Nest, stampanti, NAS o router.`,
+        parameters: {
+          type: 'object',
+          properties: {
+            cidr: {
+              type: 'string',
+              description: 'Rete CIDR opzionale, ad esempio 192.168.1.0/24. Se assente il broker usa la /24 dell IP locale.'
+            }
+          },
+          required: []
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'inspect_lan_device',
+        description: `Ispeziona un host LAN tramite il broker HeyCasa: porte note aperte, titolo/server HTTP e classificazione broker.map.
+Usare per capire che tipo di dispositivo e' un IP trovato dalla scansione.`,
+        parameters: {
+          type: 'object',
+          properties: {
+            host: {
+              type: 'string',
+              description: 'IP o hostname LAN da ispezionare, ad esempio 192.168.1.23 o dispositivo.local.'
+            }
+          },
+          required: ['host']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'ping_lan_host',
+        description: `Esegue ping ICMP tramite il broker HeyCasa verso un IP o hostname LAN.
+Usare per verificare se un host specifico e' raggiungibile.`,
+        parameters: {
+          type: 'object',
+          properties: {
+            host: {
+              type: 'string',
+              description: 'IP o hostname LAN da raggiungere.'
+            }
+          },
+          required: ['host']
+        }
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'find_lan_device',
+        description: `Cerca un dispositivo nella LAN tramite il broker HeyCasa. Fa una scansione host e ispeziona i servizi per trovare corrispondenze.
+Usare quando l'utente chiede frasi come "e' presente un Google Home in rete?", "trova Chromecast", "c'e' una stampante?", "vedi se c'e' un NAS".
+La ricerca e' best effort: usa nomi reverse DNS, porte note, titolo/server HTTP e classificazione broker.map.`,
+        parameters: {
+          type: 'object',
+          properties: {
+            query: {
+              type: 'string',
+              description: 'Dispositivo o famiglia da cercare, ad esempio "google home", "chromecast", "nest", "stampante", "nas".'
+            },
+            cidr: {
+              type: 'string',
+              description: 'Rete CIDR opzionale, ad esempio 192.168.1.0/24.'
+            },
+            limit: {
+              type: 'number',
+              description: 'Numero massimo di host da ispezionare dopo la scansione. Default 32, max 80.'
+            }
+          },
+          required: ['query']
+        }
+      }
+    }
+  ];
+
   // ─────────────────────────────────────────
   // SEZIONE 3 — REGISTRY
   // ─────────────────────────────────────────
@@ -251,6 +345,14 @@ IMPORTANTE: prima di sbloccare chiedere sempre conferma esplicita all'utente.`,
       }
     } else if (brokerType === 'homeassistant') {
       console.warn('[MCP] Home Assistant connesso senza token: salto caricamento entità dinamiche');
+    } else if (brokerType === 'heycasa') {
+      registry.dynamic.push(...HEYCASA_TOOLS);
+      try {
+        await heycasaCommand('info', brokerUrl);
+      } catch (err) {
+        entityLoadError = err.message;
+        console.warn('[MCP] broker HeyCasa non verificato:', err.message);
+      }
     }
 
     try {
@@ -339,6 +441,15 @@ IMPORTANTE: prima di sbloccare chiedere sempre conferma esplicita all'utente.`,
     switch (name) {
 
       case 'get_broker_status': {
+        if (!brokerUrl) return { status: 'offline', reason: 'Nessun broker configurato' };
+        if (registry.brokerType === 'heycasa') {
+          try {
+            const info = await heycasaCommand('info');
+            return { status: 'online', broker: registry.brokerType, url: brokerUrl, info };
+          } catch (err) {
+            return { status: 'offline', broker: registry.brokerType, url: brokerUrl, error: err.message };
+          }
+        }
         try {
           await ha('');
           return { status: 'online', broker: registry.brokerType, url: brokerUrl };
@@ -355,6 +466,34 @@ IMPORTANTE: prima di sbloccare chiedere sempre conferma esplicita all'utente.`,
           state: e.state,
           name:  e.attributes?.friendly_name
         }));
+      }
+
+      case 'get_lan_broker_info': {
+        if (!brokerUrl || registry.brokerType !== 'heycasa') return { error: 'Nessun broker HeyCasa configurato' };
+        return heycasaCommand('info');
+      }
+
+      case 'scan_lan_devices': {
+        if (!brokerUrl || registry.brokerType !== 'heycasa') return { error: 'Nessun broker HeyCasa configurato' };
+        const command = input?.cidr ? `scan ${input.cidr}` : 'scan';
+        return heycasaCommand(command);
+      }
+
+      case 'inspect_lan_device': {
+        if (!brokerUrl || registry.brokerType !== 'heycasa') return { error: 'Nessun broker HeyCasa configurato' };
+        if (!input?.host) return { error: 'host mancante' };
+        return heycasaCommand(`services ${input.host}`);
+      }
+
+      case 'ping_lan_host': {
+        if (!brokerUrl || registry.brokerType !== 'heycasa') return { error: 'Nessun broker HeyCasa configurato' };
+        if (!input?.host) return { error: 'host mancante' };
+        return heycasaCommand(`ping ${input.host}`);
+      }
+
+      case 'find_lan_device': {
+        if (!brokerUrl || registry.brokerType !== 'heycasa') return { error: 'Nessun broker HeyCasa configurato' };
+        return findLanDevice(input);
       }
 
       case 'control_light': {
@@ -530,6 +669,145 @@ IMPORTANTE: prima di sbloccare chiedere sempre conferma esplicita all'utente.`,
       messages.push(...results);
       // continua il loop
     }
+  }
+
+  function brokerWsUrl(url = registry.brokerUrl) {
+    if (!url) throw new Error('Nessun broker configurato');
+    const u = new URL(url);
+    u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:';
+    u.pathname = '/ws';
+    u.search = '';
+    u.hash = '';
+    return u.toString();
+  }
+
+  function heycasaCommand(command, explicitBrokerUrl = null, timeoutMs = 45000) {
+    return new Promise((resolve, reject) => {
+      let ws = null;
+      let settled = false;
+      const id = Date.now();
+      const finish = (fn, value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        try { if (ws) ws.close(); } catch {}
+        fn(value);
+      };
+      const timer = setTimeout(() => {
+        finish(reject, new Error(`Timeout broker HeyCasa su comando "${command}"`));
+      }, timeoutMs);
+
+      try {
+        ws = new WebSocket(brokerWsUrl(explicitBrokerUrl));
+        ws.addEventListener('open', () => {
+          ws.send(JSON.stringify({ id, command }));
+        });
+        ws.addEventListener('message', event => {
+          let msg;
+          try { msg = JSON.parse(event.data); } catch { return; }
+          if (msg.type !== 'result') return;
+          if (msg.id !== id && msg.id !== null) return;
+          finish(resolve, {
+            ok: msg.ok,
+            command: msg.command,
+            elapsed_ms: msg.elapsed_ms,
+            data: msg.data,
+          });
+        });
+        ws.addEventListener('error', () => {
+          finish(reject, new Error('Connessione WebSocket al broker HeyCasa fallita'));
+        });
+      } catch (err) {
+        finish(reject, err);
+      }
+    });
+  }
+
+  async function findLanDevice(input = {}) {
+    const query = String(input.query ?? '').trim();
+    if (!query) return { error: 'query mancante' };
+
+    const limit = Math.min(Math.max(Number(input.limit ?? 32), 1), 80);
+    const scanCommand = input.cidr ? `scan ${input.cidr}` : 'scan';
+    const scan = await heycasaCommand(scanCommand);
+    const hosts = scan?.data?.hosts ?? [];
+    const inspected = [];
+    const matches = [];
+    const needles = deviceNeedles(query);
+
+    for (const host of hosts.slice(0, limit)) {
+      const ip = host.ip;
+      if (!ip) continue;
+      let services;
+      try {
+        services = await heycasaCommand(`services ${ip}`, null, 15000);
+      } catch (err) {
+        inspected.push({ ip, name: host.name ?? null, error: err.message });
+        continue;
+      }
+
+      const candidate = {
+        ip,
+        name: host.name ?? null,
+        open_ports: services?.data?.open_ports ?? [],
+        http_title: services?.data?.http_title ?? null,
+        http_server: services?.data?.http_server ?? null,
+        device_type: services?.data?.device_type ?? '',
+        device_label: services?.data?.device_label ?? '',
+      };
+      const score = scoreDevice(candidate, needles);
+      inspected.push({ ...candidate, score });
+      if (score > 0) matches.push({ ...candidate, score });
+    }
+
+    matches.sort((a, b) => b.score - a.score);
+    return {
+      query,
+      network: scan?.data?.network ?? null,
+      scanned_hosts: hosts.length,
+      inspected_hosts: inspected.length,
+      found: matches.length > 0,
+      matches,
+      note: matches.length
+        ? 'Corrispondenze trovate tramite nome, servizi o broker.map.'
+        : 'Nessuna corrispondenza trovata. La ricerca dipende da ping, reverse DNS, porte note e broker.map.',
+    };
+  }
+
+  function deviceNeedles(query) {
+    const q = query.toLowerCase();
+    const words = q.split(/[^a-z0-9]+/).filter(Boolean);
+    const aliases = {
+      google: ['google', 'googlehome', 'google-home', 'nest', 'chromecast', 'cast', 'google cast'],
+      home: ['home', 'googlehome', 'google-home'],
+      chromecast: ['chromecast', 'cast', 'google'],
+      nest: ['nest', 'google'],
+      stampante: ['printer', 'stampante', 'ipp', 'jetdirect', '9100'],
+      printer: ['printer', 'stampante', 'ipp', 'jetdirect', '9100'],
+      nas: ['nas', 'smb', '445', 'file server'],
+      router: ['router', 'gateway', 'access point', 'ap'],
+    };
+    const expanded = new Set(words);
+    words.forEach(w => (aliases[w] || []).forEach(a => expanded.add(a)));
+    if (q.includes('google home')) ['googlehome', 'google-home', 'nest', 'chromecast', 'cast'].forEach(a => expanded.add(a));
+    return [...expanded];
+  }
+
+  function scoreDevice(candidate, needles) {
+    const haystack = [
+      candidate.ip,
+      candidate.name,
+      candidate.http_title,
+      candidate.http_server,
+      candidate.device_type,
+      candidate.device_label,
+      ...(candidate.open_ports || []).flatMap(p => [String(p.port), p.service]),
+    ].filter(Boolean).join(' ').toLowerCase();
+
+    return needles.reduce((score, needle) => {
+      if (!needle) return score;
+      return haystack.includes(needle.toLowerCase()) ? score + 1 : score;
+    }, 0);
   }
 
   return { initFromBroker, loadFromCache, clearCache, getTools, executeTool, runAgentLoop, hasBroker };
