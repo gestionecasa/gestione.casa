@@ -774,7 +774,7 @@ La ricerca e' best effort: usa nomi reverse DNS, porte note, titolo/server HTTP 
       }, timeoutMs);
 
       try {
-        ws = new WebSocket(brokerWsUrl(explicitBrokerUrl));
+        ws = new WebSocket(brokerWsUrl(explicitBrokerUrl || registry.brokerUrl));
         ws.addEventListener('open', () => {
           ws.send(JSON.stringify({ id, command }));
         });
