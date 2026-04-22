@@ -1,5 +1,5 @@
 // sw.js — Service Worker per Hey Casa PWA
-const CACHE = 'casa-v28';
+const CACHE = 'casa-v29';
 
 // Solo risorse statiche pesanti — network-first per tutto il resto
 const PRECACHE = [
@@ -29,6 +29,10 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   const ext = url.pathname.split('.').pop().toLowerCase();
+  const unavailable = () => new Response('Hey Casa non è disponibile offline.', {
+    status: 503,
+    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+  });
 
   // Immagini → cache-first
   if (['png', 'jpg', 'jpeg', 'webp', 'svg', 'ico'].includes(ext)) {
@@ -37,13 +41,13 @@ self.addEventListener('fetch', e => {
         const clone = res.clone();
         caches.open(CACHE).then(c => c.put(e.request, clone));
         return res;
-      }))
+      }).catch(unavailable))
     );
     return;
   }
 
   // HTML, JS, CSS, JSON → network-first (sempre aggiornati)
   e.respondWith(
-    fetch(e.request).catch(() => caches.match(e.request))
+    fetch(e.request).catch(() => caches.match(e.request).then(r => r || unavailable()))
   );
 });

@@ -1,7 +1,7 @@
 PORT ?= 8765
 
 dev:
-	@python3 dev-server.py $(PORT)
+	@python3 contrib/dev-server.py $(PORT)
 
 serve:
 	@echo ""

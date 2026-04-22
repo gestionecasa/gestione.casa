@@ -17,6 +17,10 @@
     return window.matchMedia(MOBILE_QUERY).matches;
   }
 
+  function isLocalDev() {
+    return ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+  }
+
   function elements() {
     return {
       banner: document.getElementById('pwaBanner'),
@@ -179,7 +183,13 @@
   };
 
   // ── Service Worker ─────────────────────────
-  if ('serviceWorker' in navigator) {
+  if ('serviceWorker' in navigator && isLocalDev()) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.getRegistrations()
+        .then(registrations => Promise.all(registrations.map(registration => registration.unregister())))
+        .catch(() => {});
+    });
+  } else if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
     });

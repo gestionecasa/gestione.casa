@@ -879,9 +879,7 @@ const App = (() => {
           </svg>
           Accedi con OpenRouter
         </button>`;
-      $('sidebarLoginBtn').addEventListener('click', () => {
-        OpenRouterAuth.startOAuth();
-      }, { once: true });
+      OpenRouterAuth.bindLoginButtons();
     }
   }
 
@@ -969,7 +967,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Mostra l'errore anche nel widget sidebar
       const authEl = document.getElementById('sidebarAuth');
       if (authEl) authEl.innerHTML = `<p class="sidebar-auth-error" title="${err.message}">⚠ Login fallito — <button class="sidebar-auth-btn" id="sidebarLoginBtn" style="display:inline;padding:2px 8px">Riprova</button></p>`;
-      document.getElementById('sidebarLoginBtn')?.addEventListener('click', () => OpenRouterAuth.startOAuth(), { once: true });
+      OpenRouterAuth.bindLoginButtons();
     }
   } else {
     App.init();

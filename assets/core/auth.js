@@ -3,6 +3,7 @@
 const OpenRouterAuth = (() => {
 
   const TOKEN_KEY = 'or_token';
+  let clickBound = false;
 
   function callbackUrl() {
     return window.location.origin + '/';
@@ -48,5 +49,18 @@ const OpenRouterAuth = (() => {
     try { localStorage.removeItem(TOKEN_KEY); } catch {}
   }
 
-  return { startOAuth, handleCallback, getToken, isAuthenticated, logout };
+  function bindLoginButtons() {
+    if (clickBound) return;
+    clickBound = true;
+    document.addEventListener('click', e => {
+      const button = e.target.closest('#sidebarLoginBtn');
+      if (!button) return;
+      e.preventDefault();
+      startOAuth();
+    });
+  }
+
+  bindLoginButtons();
+
+  return { startOAuth, handleCallback, getToken, isAuthenticated, logout, bindLoginButtons };
 })();

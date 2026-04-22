@@ -6,6 +6,7 @@ import os
 import sys
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Injected in place of sw.js — unregisters itself and clears all caches
 DEV_SW = b"""\
@@ -13,14 +14,23 @@ DEV_SW = b"""\
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => {
   e.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(keys.map(k => caches.delete(k))))
+    Promise.all([
+      caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))),
+      self.registration.unregister()
+    ])
       .then(() => self.clients.matchAll({ type: 'window' }))
       .then(clients => clients.forEach(c => c.navigate(c.url)))
   );
   self.clients.claim();
 });
-self.addEventListener('fetch', e => e.respondWith(fetch(e.request)));
+self.addEventListener('fetch', e => {
+  e.respondWith(
+    fetch(e.request).catch(() => new Response('Dev server non raggiungibile', {
+      status: 503,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+    }))
+  );
+});
 """
 
 NO_CACHE = {
@@ -54,7 +64,7 @@ class DevHandler(http.server.SimpleHTTPRequestHandler):
         super().log_message(fmt, *args)
 
 
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(ROOT)
 print(f'\n  ⌂  Hey Casa DEV — http://localhost:{PORT}')
 print('     Service worker disabled · no-cache headers active\n')
 http.server.HTTPServer(('127.0.0.1', PORT), DevHandler).serve_forever()
