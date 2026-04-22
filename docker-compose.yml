@@ -1,4 +1,14 @@
 services:
+  web:
+    image: httpd:2.4-alpine
+    container_name: gestione-casa-web
+    ports:
+      - "${PORT:-8765}:80"
+    volumes:
+      - ./:/usr/local/apache2/htdocs:ro
+      - ./contrib/httpd-dev.conf:/usr/local/apache2/conf/httpd.conf:ro
+    restart: unless-stopped
+
   homeassistant:
     image: ghcr.io/home-assistant/home-assistant:stable
     container_name: homeassistant

@@ -1,13 +1,17 @@
 PORT ?= 8765
 
 dev:
-	@python3 contrib/dev-server.py $(PORT)
+	@PORT=$(PORT) docker compose up web
 
 serve:
 	@echo ""
 	@echo "  ⌂  Hey Casa — http://localhost:$(PORT)"
 	@echo ""
-	@python3 -m http.server $(PORT) --bind 127.0.0.1
+	@PORT=$(PORT) docker compose up web
+
+dev-down:
+	@PORT=$(PORT) docker compose stop web
+	@PORT=$(PORT) docker compose rm -f web
 
 push:
 	@git add .
