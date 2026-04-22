@@ -159,6 +159,7 @@ const BrokerDiscovery = (() => {
 
   async function diagnoseIp(ip) {
     const startedAt = performance.now();
+    const environment = diagnoseBrowserAccess(ip);
     const results = await Promise.all(BROKERS.map(async broker => {
       const t0 = performance.now();
       try {
@@ -186,9 +187,37 @@ const BrokerDiscovery = (() => {
     return {
       ip,
       elapsed: Math.round(performance.now() - startedAt),
+      environment,
       results,
       found: results.filter(r => r.ok),
     };
+  }
+
+  function diagnoseBrowserAccess(host) {
+    const isIp = /^(?:\d{1,3}\.){3}\d{1,3}$/.test(host);
+    const privateIp = isIp && (
+      /^10\./.test(host) ||
+      /^192\.168\./.test(host) ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(host)
+    );
+    const loopback = host === 'localhost' || host === '127.0.0.1';
+    const pageHttps = location.protocol === 'https:';
+    return {
+      origin: location.origin,
+      protocol: location.protocol,
+      secureContext: window.isSecureContext,
+      targetHost: host,
+      targetIsPrivateIp: privateIp,
+      targetIsLoopback: loopback,
+      mixedContentRisk: pageHttps && privateIp,
+      privateNetworkAccessRisk: window.isSecureContext && privateIp && !samePrivateOrigin(host),
+    };
+  }
+
+  function samePrivateOrigin(host) {
+    const h = location.hostname;
+    if (!/^(?:\d{1,3}\.){3}\d{1,3}$/.test(h)) return false;
+    return h.split('.').slice(0, 3).join('.') === host.split('.').slice(0, 3).join('.');
   }
 
   // ── Probe IP fissi ─────────────────────────

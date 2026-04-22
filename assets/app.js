@@ -627,6 +627,7 @@ const App = (() => {
     console.groupCollapsed('[BrokerPing] diagnose IP');
     console.log('target:', ip);
     const report = await BrokerDiscovery.diagnoseIp(ip);
+    console.log('browser environment:', report.environment);
     console.table(report.results.map(r => ({
       broker: r.name,
       url: r.url,
@@ -645,12 +646,38 @@ const App = (() => {
     const found = report.found.length
       ? `\n\nTrovati: ${report.found.map(r => `**${r.name}**`).join(', ')}.`
       : '\n\nNessun broker riconosciuto su questo IP.';
+    const envDetails = buildPingEnvironmentDetails(report.environment);
+    const policyNote = buildPingPolicyNote(report.environment);
 
     return {
       tool: 'broker_ping',
       toolResult: `${report.found.length}/${report.results.length} broker`,
-      message: `Diagnostica discovery su \`${report.ip}\` completata in ${report.elapsed}ms.\n\n${lines}${found}\n\nDettagli completi in console: gruppo \`[BrokerPing]\`.`,
+      message: `Diagnostica discovery su \`${report.ip}\` completata in ${report.elapsed}ms.\n\n${lines}${found}\n\n${envDetails}${policyNote}`,
     };
+  }
+
+  function buildPingEnvironmentDetails(env) {
+    return [
+      '**Ambiente browser/PWA**',
+      `Origine app: \`${env.origin}\``,
+      `Secure context: ${env.secureContext ? 'si' : 'no'}`,
+      `Target privato LAN: ${env.targetIsPrivateIp ? 'si' : 'no'}`,
+      `Target loopback: ${env.targetIsLoopback ? 'si' : 'no'}`,
+      `Mixed content risk: ${env.mixedContentRisk ? 'si' : 'no'}`,
+      `Private Network Access risk: ${env.privateNetworkAccessRisk ? 'si' : 'no'}`,
+    ].join('\n');
+  }
+
+  function buildPingPolicyNote(env) {
+    const notes = [];
+    if (env.mixedContentRisk) {
+      notes.push(`la pagina è servita da \`${env.origin}\` e sta provando HTTP verso un IP LAN: il browser può bloccarlo come mixed content`);
+    }
+    if (env.privateNetworkAccessRisk) {
+      notes.push('Chrome può richiedere Private Network Access/CORS verso IP privati LAN');
+    }
+    if (!notes.length) return '';
+    return `\n\n**Nota browser**\n${notes.join('\n')}.`;
   }
 
   function isValidLanHost(host) {

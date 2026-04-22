@@ -1,5 +1,5 @@
 // sw.js — Service Worker per Hey Casa PWA
-const CACHE = 'casa-v26';
+const CACHE = 'casa-v28';
 
 // Solo risorse statiche pesanti — network-first per tutto il resto
 const PRECACHE = [
