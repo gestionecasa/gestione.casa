@@ -32,6 +32,23 @@ Per fermarlo:
 make dev-down
 ```
 
+## Broker LAN
+
+Per cercare dispositivi nella rete locale serve il broker HeyCasa:
+
+```sh
+make broker
+```
+
+Il broker espone WebSocket su `localhost:29001` e viene usato dalla app per
+`scan_lan_devices`, `find_lan_device`, `inspect_lan_device` e `ping_lan_host`.
+
+Per fermarlo:
+
+```sh
+make broker-down
+```
+
 ## PWA e service worker
 
 In locale (`localhost`, `127.0.0.1`, `::1`) la app non registra il service worker.

@@ -600,6 +600,9 @@ const App = (() => {
     const pingMatch = text.trim().match(/^\/ping\s+([a-z0-9.-]+)$/i);
     if (pingMatch) return runPingCommand(pingMatch[1]);
 
+    const lanSearch = extractLanDeviceSearch(text);
+    if (lanSearch) return runLanDeviceSearch(lanSearch);
+
     if (!['/install', '/uninstall', '/cache clean'].includes(command)) return null;
 
     if (!window.HeyCasaPWA) {
@@ -613,6 +616,127 @@ const App = (() => {
     if (command === '/install') return window.HeyCasaPWA.install();
     if (command === '/uninstall') return window.HeyCasaPWA.uninstall();
     return window.HeyCasaPWA.cleanCache();
+  }
+
+  function extractLanDeviceSearch(text) {
+    const m = text.toLowerCase()
+      .replace(/[àáâã]/g, 'a').replace(/[èéêë]/g, 'e')
+      .replace(/[ìíî]/g, 'i').replace(/[òóô]/g, 'o')
+      .replace(/[ùúû]/g, 'u');
+
+    const asksNetwork = /\b(rete|lan|broker|dispositiv|scansion|cerca|trova|presente)\b/.test(m);
+    if (!asksNetwork) return null;
+
+    const known = [
+      ['google home mini', /google\s+home\s+mini/],
+      ['google home', /google\s+home/],
+      ['chromecast', /chromecast|google\s+cast/],
+      ['nest', /\bnest\b/],
+      ['stampante', /stampante|printer/],
+      ['nas', /\bnas\b/],
+      ['router', /router|gateway|access\s+point/],
+    ];
+
+    const found = known.find(([, pattern]) => pattern.test(m));
+    if (found) return found[0];
+
+    const generic = m.match(/(?:cerca|trova|presente|vedi se c'?e)\s+(?:nella rete|in lan|tramite il broker|un|una|il|la|mio|mia|\s)*([a-z0-9 ._-]{3,40})/i);
+    return generic ? generic[1].trim() : null;
+  }
+
+  async function runLanDeviceSearch(query) {
+    let info = McpLayer.getBrokerInfo();
+    if (!info.connected || info.type !== 'heycasa') {
+      const connected = await connectDefaultHeyCasaBroker();
+      if (connected) info = McpLayer.getBrokerInfo();
+    }
+
+    if (!info.connected || info.type !== 'heycasa') {
+      return {
+        tool: 'find_lan_device',
+        toolParams: { query },
+        toolResult: 'broker HeyCasa non connesso',
+        message: info.connected
+          ? `Sei connesso a **${info.type}**, ma per scansionare la LAN serve il **HeyCasa Broker**. Collega il broker HeyCasa e riprova.`
+          : 'Per cercare dispositivi nella LAN serve il **HeyCasa Broker** su `localhost:29001`. Avvialo con `docker compose up broker` o `make broker`, poi riprova.',
+      };
+    }
+
+    try {
+      const result = await McpLayer.executeTool('find_lan_device', { query, limit: 80 });
+      return formatLanDeviceSearchResult(query, result);
+    } catch (err) {
+      return {
+        tool: 'find_lan_device',
+        toolParams: { query },
+        toolResult: 'errore',
+        message: `Errore durante la ricerca di **${query}** tramite broker: ${err.message}`,
+      };
+    }
+  }
+
+  async function connectDefaultHeyCasaBroker() {
+    const candidates = defaultHeyCasaBrokerUrls();
+    for (const url of candidates) {
+      try {
+        const initInfo = await McpLayer.initFromBroker(url, null, 'heycasa');
+        const status = await McpLayer.executeTool('get_lan_broker_info', {});
+        if (status?.ok === false || status?.error) throw new Error(status?.error || 'broker non verificato');
+        console.log('[BrokerConnect] HeyCasa agganciato automaticamente', { url, initInfo, status });
+        saveBroker({ id: 'heycasa', name: 'HeyCasa Broker', ip: new URL(url).hostname, port: 29001, url, icon: '⌂' });
+        agentTagline.textContent = 'Connesso — HeyCasa Broker';
+        return true;
+      } catch (err) {
+        console.warn('[BrokerConnect] auto-connect HeyCasa fallito', { url, error: err.message });
+        if (McpLayer.getBrokerInfo().url === url) McpLayer.clearCache();
+      }
+    }
+    return false;
+  }
+
+  function defaultHeyCasaBrokerUrls() {
+    const hosts = ['127.0.0.1'];
+    if (location.hostname && !['localhost', '127.0.0.1'].includes(location.hostname)) {
+      hosts.unshift(location.hostname);
+    }
+    return [...new Set(hosts)].map(host => `http://${host}:29001`);
+  }
+
+  function formatLanDeviceSearchResult(query, result) {
+    if (result?.error) {
+      return {
+        tool: 'find_lan_device',
+        toolParams: { query },
+        toolResult: 'errore',
+        message: result.error,
+      };
+    }
+
+    const matches = result.matches || [];
+    const summary = `Scansione ${result.network || 'LAN'}: ${result.scanned_hosts || 0} host raggiungibili, ${result.inspected_hosts || 0} ispezionati.`;
+
+    if (!matches.length) {
+      return {
+        tool: 'find_lan_device',
+        toolParams: { query },
+        toolResult: 'nessuna corrispondenza',
+        message: `${summary}\n\nNon ho trovato corrispondenze per **${query}**. La ricerca usa ping, reverse DNS, porte note e regole broker.map: Google Home/Nest spesso non espone HTTP riconoscibile, quindi puo comparire solo come host generico.`,
+      };
+    }
+
+    const lines = matches.slice(0, 8).map(match => {
+      const name = match.name ? ` — ${match.name}` : '';
+      const label = match.device_label || match.device_type || 'dispositivo compatibile';
+      const ports = (match.open_ports || []).map(p => p.port || p).filter(Boolean).join(', ');
+      return `- \`${match.ip}\`${name}: ${label}${ports ? `, porte ${ports}` : ''}`;
+    }).join('\n');
+
+    return {
+      tool: 'find_lan_device',
+      toolParams: { query },
+      toolResult: `${matches.length} match`,
+      message: `${summary}\n\nPossibili corrispondenze per **${query}**:\n${lines}`,
+    };
   }
 
   async function runPingCommand(ip) {

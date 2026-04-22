@@ -28,7 +28,8 @@ Chiamare quando l'utente chiede "cosa puoi fare?", "quali comandi hai?",
         name: 'start_broker_scan',
         description: `Avvia la scansione della rete LAN per trovare broker domotici (Home Assistant, MQTT, Node-RED, ecc.).
 La scansione parte in background. Usare quando l'utente dice "cerca broker", "scansiona la rete",
-"trova dispositivi", "avvia ricerca". Se una scansione è già in corso, lo segnala senza riavviarla.`,
+"avvia ricerca broker". Non usare questo tool per cercare dispositivi se esiste gia un broker HeyCasa connesso:
+in quel caso usare scan_lan_devices o find_lan_device.`,
         parameters: { type: 'object', properties: {}, required: [] }
       }
     },
@@ -294,6 +295,57 @@ La ricerca e' best effort: usa nomi reverse DNS, porte note, titolo/server HTTP 
     brokerType:  null,
   };
 
+  function hasDynamicTool(name) {
+    return registry.dynamic.some(tool => tool.function?.name === name);
+  }
+
+  function ensureHeyCasaTools() {
+    if (registry.brokerType !== 'heycasa') return;
+    if (!hasDynamicTool('find_lan_device')) registry.dynamic.push(...HEYCASA_TOOLS);
+  }
+
+  function saveRegistry() {
+    localStorage.setItem('mcp_registry', JSON.stringify({
+      dynamic: registry.dynamic,
+      brokerUrl: registry.brokerUrl,
+      brokerToken: registry.brokerToken,
+      brokerType: registry.brokerType,
+    }));
+  }
+
+  function restoreSavedBroker() {
+    try {
+      const raw = localStorage.getItem('hc-broker');
+      if (!raw) return false;
+      const broker = JSON.parse(raw);
+      if (!broker?.url || !broker?.id) return false;
+
+      registry.brokerUrl = broker.url;
+      registry.brokerToken = broker.haToken || null;
+      registry.brokerType = broker.id;
+      registry.dynamic = [];
+      if (broker.id === 'heycasa') ensureHeyCasaTools();
+      saveRegistry();
+      console.log('[MCP] registry ripristinato da hc-broker', {
+        brokerUrl: registry.brokerUrl,
+        brokerType: registry.brokerType,
+        dynamicTools: registry.dynamic.length,
+      });
+      return true;
+    } catch (err) {
+      console.warn('[MCP] impossibile ripristinare hc-broker:', err.message);
+      return false;
+    }
+  }
+
+  function ensureBrokerConfigured() {
+    if (registry.brokerUrl) {
+      ensureHeyCasaTools();
+      return true;
+    }
+    return restoreSavedBroker();
+  }
+
   // ─────────────────────────────────────────
   // SEZIONE 4 — DISCOVERY → ESPANSIONE META TOOL
   // ─────────────────────────────────────────
@@ -356,9 +408,7 @@ La ricerca e' best effort: usa nomi reverse DNS, porte note, titolo/server HTTP 
     }
 
     try {
-      localStorage.setItem('mcp_registry', JSON.stringify({
-        dynamic: registry.dynamic, brokerUrl, brokerToken, brokerType
-      }));
+      saveRegistry();
       console.log('[MCP] registry salvato in localStorage');
     } catch (err) {
       console.warn('[MCP] impossibile salvare registry:', err.message);
@@ -377,12 +427,16 @@ La ricerca e' best effort: usa nomi reverse DNS, porte note, titolo/server HTTP 
   function loadFromCache() {
     try {
       const raw = localStorage.getItem('mcp_registry');
-      if (!raw) return false;
+      if (!raw) return restoreSavedBroker();
       const data = JSON.parse(raw);
       Object.assign(registry, data);
+      if (!registry.brokerUrl) return restoreSavedBroker();
+      ensureHeyCasaTools();
       console.log(`[MCP] registry caricato dalla cache — ${registry.dynamic.length} tool dinamici`);
       return true;
-    } catch { return false; }
+    } catch {
+      return restoreSavedBroker();
+    }
   }
 
   function clearCache() {
@@ -396,11 +450,23 @@ La ricerca e' best effort: usa nomi reverse DNS, porte note, titolo/server HTTP 
   // ─────────────────────────────────────────
 
   function getTools() {
+    ensureBrokerConfigured();
     return [...STATIC_TOOLS, ...registry.dynamic];
   }
 
   function hasBroker() {
+    ensureBrokerConfigured();
     return !!registry.brokerUrl;
+  }
+
+  function getBrokerInfo() {
+    ensureBrokerConfigured();
+    return {
+      connected: !!registry.brokerUrl,
+      url: registry.brokerUrl,
+      type: registry.brokerType,
+      dynamicTools: registry.dynamic.length,
+    };
   }
 
   // ─────────────────────────────────────────
@@ -408,6 +474,7 @@ La ricerca e' best effort: usa nomi reverse DNS, porte note, titolo/server HTTP 
   // ─────────────────────────────────────────
 
   async function executeTool(name, input) {
+    ensureBrokerConfigured();
     const { brokerUrl, brokerToken } = registry;
 
     const ha = async (path, method = 'GET', body = null) => {
@@ -528,6 +595,15 @@ La ricerca e' best effort: usa nomi reverse DNS, porte note, titolo/server HTTP 
       }
 
       case 'start_broker_scan': {
+        if (brokerUrl && registry.brokerType === 'heycasa') {
+          return {
+            started: false,
+            broker_connected: true,
+            broker: registry.brokerType,
+            url: brokerUrl,
+            message: 'Broker HeyCasa gia connesso. Per cercare dispositivi nella LAN usa scan_lan_devices o find_lan_device.',
+          };
+        }
         const s = BrokerDiscovery.getStatus();
         if (s.status === 'running') {
           if (typeof App !== 'undefined') App.showDiscoveryBar();
@@ -810,5 +886,5 @@ La ricerca e' best effort: usa nomi reverse DNS, porte note, titolo/server HTTP 
     }, 0);
   }
 
-  return { initFromBroker, loadFromCache, clearCache, getTools, executeTool, runAgentLoop, hasBroker };
+  return { initFromBroker, loadFromCache, clearCache, getTools, executeTool, runAgentLoop, hasBroker, getBrokerInfo };
 })();
